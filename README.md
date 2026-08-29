@@ -10,6 +10,7 @@ dimensional modelling, ETL, PostgreSQL and analytical queries.
 
 ```text
 docs/
+├── proposal/
 ├── modeling/
 │   ├── dfm/
 │   └── star-schema/
@@ -43,6 +44,12 @@ tests/
 4. Transform and integrate the data through ETL.
 5. Load the warehouse in PostgreSQL.
 6. Run analytical and OLAP queries.
+
+## Project documentation
+
+The approved project proposal is available in `docs/proposal/`. Modelling
+artifacts are organised under `docs/modeling/`, while presentation materials
+will be added to `docs/presentation/` when they are finalised.
 
 ## Data and reproducibility
 
