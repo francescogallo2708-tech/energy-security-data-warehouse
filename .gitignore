@@ -10,6 +10,7 @@ __pycache__/
 venv/
 env/
 .env
+.pgpass.local
 
 # Jupyter and tooling
 .ipynb_checkpoints/

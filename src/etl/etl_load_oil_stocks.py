@@ -10,10 +10,13 @@ from psycopg2.extras import execute_values
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
-    'password': os.environ.get('PGPASSWORD') or getpass.getpass('Password PostgreSQL: '),
     'host': os.environ.get('PGHOST', 'localhost'),
     'port': os.environ.get('PGPORT', '5433')
 }
+if os.environ.get('PGPASSWORD'):
+    DB_CONFIG['password'] = os.environ['PGPASSWORD']
+elif not os.environ.get('PGPASSFILE'):
+    DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 STOCK_INDICATORS = {
     'IC_DC': ('Closing stock level', 'Stock level', None),
@@ -41,8 +44,11 @@ def load_oil_stocks_fact():
     print("--- AVVIO ETL FACT_OIL_STOCKS ---")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    tsv_file = os.path.join(project_dir, "Dataset", "raw", "eurostat", "nrg_stk_oem_tabular.tsv")
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    tsv_file = os.environ.get(
+        'OIL_STOCKS_TSV',
+        os.path.join(project_dir, "data", "raw", "eurostat", "nrg_stk_oem_tabular.tsv")
+    )
 
     if not os.path.exists(tsv_file):
         print(f"[ERRORE] File {tsv_file} non trovato.")
