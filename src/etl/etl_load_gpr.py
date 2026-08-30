@@ -7,17 +7,23 @@ from psycopg2.extras import execute_values
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
-    'password': os.environ.get('PGPASSWORD') or getpass.getpass('Password PostgreSQL: '),
     'host': os.environ.get('PGHOST', 'localhost'),
     'port': os.environ.get('PGPORT', '5433')
 }
+if os.environ.get('PGPASSWORD'):
+    DB_CONFIG['password'] = os.environ['PGPASSWORD']
+elif not os.environ.get('PGPASSFILE'):
+    DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 def load_gpr_fact():
     print("--- AVVIO ETL FACT_GPR ---")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    gpr_file = os.path.join(project_dir, "Dataset", "raw", "gpr", "data_gpr_export_202608.xls")
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    default_gpr_file = os.path.join(
+        project_dir, "data", "raw", "gpr", "data_gpr_export_202608.xls"
+    )
+    gpr_file = os.path.expanduser(os.environ.get('GPR_SOURCE_FILE', default_gpr_file))
     
     if not os.path.exists(gpr_file):
         print(f"[ERRORE] Impossibile trovare il file {gpr_file}.")

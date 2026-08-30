@@ -7,17 +7,25 @@ from psycopg2.extras import execute_values
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
-    'password': os.environ.get('PGPASSWORD') or getpass.getpass('Password PostgreSQL: '),
     'host': os.environ.get('PGHOST', 'localhost'),
     'port': os.environ.get('PGPORT', '5433')
 }
+if os.environ.get('PGPASSWORD'):
+    DB_CONFIG['password'] = os.environ['PGPASSWORD']
+elif not os.environ.get('PGPASSFILE'):
+    DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 def load_import_dependency_fact():
     print("--- AVVIO ETL FACT_IMPORT_DEPENDENCY ---")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    tsv_file = os.path.join(project_dir, "Dataset", "raw", "eurostat", "nrg_ind_id_tabular.tsv")
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    default_tsv_file = os.path.join(
+        project_dir, "data", "raw", "eurostat", "nrg_ind_id_tabular.tsv"
+    )
+    tsv_file = os.path.expanduser(
+        os.environ.get('IMPORT_DEPENDENCY_TSV', default_tsv_file)
+    )
     
     if not os.path.exists(tsv_file):
         print(f"[ERRORE] File {tsv_file} non trovato nella cartella corrente.")

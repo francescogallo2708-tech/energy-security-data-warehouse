@@ -1,5 +1,6 @@
 import os
 import getpass
+import re
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
@@ -7,10 +8,13 @@ from psycopg2.extras import execute_values
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
-    'password': os.environ.get('PGPASSWORD') or getpass.getpass('Password PostgreSQL: '),
     'host': os.environ.get('PGHOST', 'localhost'),
     'port': os.environ.get('PGPORT', '5433')
 }
+if os.environ.get('PGPASSWORD'):
+    DB_CONFIG['password'] = os.environ['PGPASSWORD']
+elif not os.environ.get('PGPASSFILE'):
+    DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 PRICE_FILES = [
     {'file': 'nrg_pc_202_tabular.tsv', 'commodity': 'GAS', 'consumer': 'HOUSEHOLD'},
@@ -19,12 +23,21 @@ PRICE_FILES = [
     {'file': 'nrg_pc_205_tabular.tsv', 'commodity': 'ELECTRICITY', 'consumer': 'NON_HOUSEHOLD'}
 ]
 
+
+def extract_flag(raw_value):
+    flags = ''.join(re.findall(r'[A-Za-z]+', str(raw_value).strip()))
+    return flags or None
+
+
 def load_energy_prices():
     print("--- AVVIO ETL FACT_ENERGY_PRICE ---")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    eurostat_dir = os.path.join(project_dir, "Dataset", "raw", "eurostat")
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    default_eurostat_dir = os.path.join(project_dir, "data", "raw", "eurostat")
+    eurostat_dir = os.path.expanduser(
+        os.environ.get('ENERGY_PRICES_DIR', default_eurostat_dir)
+    )
     
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
@@ -67,12 +80,16 @@ def load_energy_prices():
         
         df_long['clean_val'] = df_long['raw_val'].astype(str).str.replace(r'[^\d.-]', '', regex=True)
         df_long['price_val'] = pd.to_numeric(df_long['clean_val'], errors='coerce')
+        df_long['eurostat_flag'] = df_long['raw_val'].apply(extract_flag)
         df_valid = df_long.dropna(subset=['price_val']).copy()
         
         geo_col = next((c for c in df_valid.columns if 'geo' in c.lower()), 'geo')
         product_col = next((c for c in df_valid.columns if 'cons' in c.lower() or 'product' in c.lower() or 'nrg' in c.lower()), df_split.columns[1])
         tax_col = next((c for c in df_valid.columns if 'tax' in c.lower()), df_split.columns[2])
         unit_col = next((c for c in df_valid.columns if 'unit' in c.lower()), df_split.columns[0])
+        currency_col = next((c for c in df_valid.columns if 'currency' in c.lower()), None)
+        if currency_col is None:
+            raise ValueError(f"Dimensione 'currency' non trovata in {filepath}")
         
         # Mappatura e pulizia dei valori
         df_valid['geo_code'] = df_valid[geo_col].astype(str).str.strip()
@@ -80,6 +97,7 @@ def load_energy_prices():
         df_valid['product_code'] = df_valid[product_col].astype(str).str.strip()
         df_valid['tax_status'] = df_valid[tax_col].astype(str).str.strip()
         df_valid['unit_code'] = df_valid[unit_col].astype(str).str.strip()
+        df_valid['currency_code'] = df_valid[currency_col].astype(str).str.strip()
         
         # Filtraggio per codici geografici e semestri validi
         df_filtered = df_valid[
@@ -90,9 +108,43 @@ def load_energy_prices():
         df_filtered['geo_sk'] = df_filtered['geo_code'].map(geo_map)
         df_filtered['commodity_type'] = cfg['commodity']
         df_filtered['consumer_type'] = cfg['consumer']
-        
+
+        price_unit_rows = list(
+            df_filtered[['unit_code', 'currency_code']]
+            .drop_duplicates()
+            .itertuples(index=False, name=None)
+        )
+        execute_values(
+            cursor,
+            """
+            INSERT INTO DT_PRICE_UNIT (energy_unit_code, currency_code)
+            VALUES %s
+            ON CONFLICT (energy_unit_code, currency_code) DO NOTHING;
+            """,
+            price_unit_rows
+        )
+        cursor.execute(
+            "SELECT energy_unit_code, currency_code, price_unit_sk FROM DT_PRICE_UNIT;"
+        )
+        price_unit_map = {(unit, currency): sk for unit, currency, sk in cursor.fetchall()}
+        df_filtered['price_unit_sk'] = [
+            price_unit_map[(unit, currency)]
+            for unit, currency in zip(
+                df_filtered['unit_code'], df_filtered['currency_code']
+            )
+        ]
+        df_filtered['price_comparability_flag'] = None
+
         # Deduplicazione sulle chiavi univoche mantenendo l'ultimo valore letto
-        key_cols = ['sem_sk', 'geo_sk', 'commodity_type', 'consumer_type', 'product_code', 'tax_status', 'unit_code']
+        key_cols = [
+            'sem_sk',
+            'geo_sk',
+            'commodity_type',
+            'consumer_type',
+            'product_code',
+            'tax_status',
+            'price_unit_sk'
+        ]
         df_dedup = df_filtered.drop_duplicates(subset=key_cols, keep='last')
         
         tuples_to_insert = [
@@ -103,18 +155,25 @@ def load_energy_prices():
                 row['consumer_type'],
                 row['product_code'],
                 row['tax_status'],
-                row['unit_code'],
+                int(row['price_unit_sk']),
+                row['price_comparability_flag'],
+                row['eurostat_flag'],
                 float(row['price_val'])
             )
             for _, row in df_dedup.iterrows()
         ]
         
         insert_query = """
-            INSERT INTO FACT_ENERGY_PRICE 
-            (semester_sk, geo_sk, commodity_type, consumer_type, product_code, tax_status, unit_code, price_val)
+            INSERT INTO FACT_ENERGY_PRICE
+            (semester_sk, geo_sk, commodity_type, consumer_type, product_code, tax_status,
+             price_unit_sk, price_comparability_flag, eurostat_flag, price_val)
             VALUES %s
-            ON CONFLICT (semester_sk, geo_sk, commodity_type, consumer_type, product_code, tax_status, unit_code) 
-            DO UPDATE SET price_val = EXCLUDED.price_val;
+            ON CONFLICT (semester_sk, geo_sk, commodity_type, consumer_type, product_code,
+                         tax_status, price_unit_sk)
+            DO UPDATE SET
+                price_comparability_flag = EXCLUDED.price_comparability_flag,
+                eurostat_flag = EXCLUDED.eurostat_flag,
+                price_val = EXCLUDED.price_val;
         """
         
         execute_values(cursor, insert_query, tuples_to_insert)
