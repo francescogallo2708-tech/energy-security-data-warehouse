@@ -63,3 +63,24 @@ WHERE g.entity_type = 'Country'
 GROUP BY y.year_value, g.country_name
 HAVING AVG(dep.dep_rate_val) IS NOT NULL
 ORDER BY y.year_value DESC, tasso_dipendenza_import_pct DESC;
+
+
+-- 4. ANALISI DINAMICA APPARTENENZA UE (TRAMITE TABELLA PONTE BR_GEO_EU_MEMBERSHIP)
+-- Calcola la dipendenza energetica media ed i prezzi dell'energia per i soli paesi
+-- che erano EFFETTIVAMENTE membri dell'Unione Europea in ciascun specifico anno storico.
+SELECT 
+    y.year_value AS anno,
+    COUNT(DISTINCT g.geo_sk) AS numero_paesi_membri_ue,
+    ROUND(AVG(dep.dep_rate_val), 2) AS dipendenza_media_membri_ue_pct,
+    ROUND(AVG(p.price_val), 4) AS prezzo_medio_elettricita_ue
+FROM br_geo_eu_membership br
+JOIN dt_year y ON br.year_sk = y.year_sk
+JOIN dim_geo_entity g ON br.geo_sk = g.geo_sk
+LEFT JOIN fact_import_dependency dep ON dep.year_sk = y.year_sk AND dep.geo_sk = g.geo_sk
+LEFT JOIN dt_semester s ON s.year_val = y.year_sk
+LEFT JOIN fact_energy_price p ON p.semester_sk = s.semester_sk 
+                             AND p.geo_sk = g.geo_sk 
+                             AND UPPER(p.commodity_type) = 'ELECTRICITY'
+GROUP BY y.year_value
+ORDER BY y.year_value DESC;
+
