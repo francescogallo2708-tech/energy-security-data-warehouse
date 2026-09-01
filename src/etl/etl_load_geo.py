@@ -57,9 +57,16 @@ def load_geography_dimension():
         {"eurostat": "SK", "iso2": "SK", "iso3": "SVK", "name": "Slovakia", "type": "Country", "eu": True},
         {"eurostat": "TR", "iso2": "TR", "iso3": "TUR", "name": "Türkiye", "type": "Country", "eu": False},
         {"eurostat": "UK", "iso2": "GB", "iso3": "GBR", "name": "United Kingdom", "type": "Country", "eu": False},
-        {"eurostat": "EU27_2020", "iso2": None, "iso3": None, "name": "European Union - 27 countries (from 2020)", "type": "Aggregate", "eu": True},
+        {"eurostat": "BA", "iso2": "BA", "iso3": "BIH", "name": "Bosnia and Herzegovina", "type": "Country", "eu": False},
+        {"eurostat": "EA", "iso2": None, "iso3": None, "name": "Euro area (variable composition)", "type": "Aggregate", "eu": True},
+        {"eurostat": "EA19", "iso2": None, "iso3": None, "name": "Euro area - 19 countries (2015-2022)", "type": "Aggregate", "eu": True},
         {"eurostat": "EA20", "iso2": None, "iso3": None, "name": "Euro area - 20 countries (from 2023)", "type": "Aggregate", "eu": True},
-        {"eurostat": "GLOBAL", "iso2": "WO", "iso3": "WLD", "name": "Global / World", "type": "Global", "eu": False}
+        {"eurostat": "EU27_2020", "iso2": None, "iso3": None, "name": "European Union - 27 countries (from 2020)", "type": "Aggregate", "eu": True},
+        {"eurostat": "GLOBAL", "iso2": "WO", "iso3": "WLD", "name": "Global / World", "type": "Global", "eu": False},
+        {"eurostat": "IS", "iso2": "IS", "iso3": "ISL", "name": "Iceland", "type": "Country", "eu": False},
+        {"eurostat": "LI", "iso2": "LI", "iso3": "LIE", "name": "Liechtenstein", "type": "Country", "eu": False},
+        {"eurostat": "UA", "iso2": "UA", "iso3": "UKR", "name": "Ukraine", "type": "Country", "eu": False},
+        {"eurostat": "XK", "iso2": "XK", "iso3": "XKX", "name": "Kosovo", "type": "Country", "eu": False}
     ]
     
     df = pd.DataFrame(geo_data)
