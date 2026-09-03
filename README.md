@@ -56,5 +56,3 @@ will be added to `docs/presentation/` when they are finalised.
 Source references, metadata and download instructions belong in
 `docs/data-sources/`. Large or redistributable-restricted data files should
 remain local; small, shareable examples can be placed in `data/sample/`.
-
-Setup and execution instructions will be added as the implementation matures.
