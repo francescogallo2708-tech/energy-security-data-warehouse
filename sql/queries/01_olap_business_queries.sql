@@ -2,34 +2,65 @@
 -- QUERY OLAP & ANALISI ANALITICA - DATA WAREHOUSE ENERGY SECURITY & GPR
 -- ==============================================================================
 
--- 1. ANALISI CORRELAZIONE RISCHIO GEOPOLITICO GLOBALE E PREZZI ENERGIA NEI PAESI (CROSS-PROCESSO)
--- Calcola la media annuale dell'indice Geopolitical Risk (GPR) rispetto ai prezzi medi
--- dell'Elettricità nei paesi europei per consumatori Non-Household nella fascia Eurostat IC,
--- espressi in EUR/kWh ed esclusi IVA e tributi recuperabili.
-SELECT 
-    y.year_value AS anno,
-    g.country_name AS paese,
-    ROUND(AVG(gpr.gpr_val), 2) AS gpr_medio_annuale,
-    ROUND(AVG(p.price_val), 4) AS prezzo_medio_elettricita_non_household
-FROM fact_energy_price p
-JOIN dt_semester s ON p.semester_sk = s.semester_sk
-JOIN dt_year y ON s.year_val = y.year_sk
-JOIN dim_geo_entity g ON p.geo_sk = g.geo_sk
-JOIN dt_consumption_band cb ON p.consumption_band_sk = cb.consumption_band_sk
-JOIN dt_tax_level tl ON p.tax_level_sk = tl.tax_level_sk
-JOIN dt_price_unit pu ON p.price_unit_sk = pu.price_unit_sk
-JOIN dt_month m ON m.year_val = y.year_sk
-JOIN dim_geo_entity g_global ON g_global.eurostat_code = 'GLOBAL'
-JOIN fact_gpr gpr ON gpr.month_sk = m.month_sk AND gpr.geo_sk = g_global.geo_sk
-WHERE cb.commodity_type = 'ELECTRICITY'
-  AND cb.consumer_type = 'NON_HOUSEHOLD'
-  AND cb.band_code = 'MWH500-1999'
-  AND tl.tax_code = 'X_VAT'
-  AND pu.currency_code = 'EUR'
-  AND pu.energy_unit_code = 'KWH'
-  AND g.entity_type = 'Country'
-GROUP BY y.year_value, g.country_name
-ORDER BY y.year_value DESC, gpr_medio_annuale DESC;
+-- 1. CORRELAZIONE TRA RISCHIO GEOPOLITICO GLOBALE E PREZZI DELL'ELETTRICITÀ
+-- Per ogni paese calcola il coefficiente di Pearson tra il GPR globale medio
+-- annuale e il prezzo medio annuo dell'elettricità non-household (fascia IC,
+-- EUR/kWh, IVA esclusa). Le due serie vengono aggregate separatamente prima
+-- del join per rispettare le rispettive granularità mensile e semestrale. Sono
+-- inclusi solo i paesi con almeno 18 anni confrontabili.
+WITH gpr_by_year AS (
+    SELECT
+        m.year_val AS anno,
+        AVG(gpr.gpr_val) AS gpr_medio_annuale
+    FROM fact_gpr gpr
+    JOIN dt_month m ON m.month_sk = gpr.month_sk
+    JOIN dim_geo_entity geo ON geo.geo_sk = gpr.geo_sk
+    WHERE geo.eurostat_code = 'GLOBAL'
+    GROUP BY m.year_val
+),
+price_by_country_year AS (
+    SELECT
+        s.year_val AS anno,
+        g.country_name AS paese,
+        AVG(p.price_val) AS prezzo_medio_annuale
+    FROM fact_energy_price p
+    JOIN dt_semester s ON s.semester_sk = p.semester_sk
+    JOIN dim_geo_entity g ON g.geo_sk = p.geo_sk
+    JOIN dt_consumption_band cb ON cb.consumption_band_sk = p.consumption_band_sk
+    JOIN dt_tax_level tl ON tl.tax_level_sk = p.tax_level_sk
+    JOIN dt_price_unit pu ON pu.price_unit_sk = p.price_unit_sk
+    WHERE cb.commodity_type = 'ELECTRICITY'
+      AND cb.consumer_type = 'NON_HOUSEHOLD'
+      AND cb.band_code = 'MWH500-1999'
+      AND tl.tax_code = 'X_VAT'
+      AND pu.currency_code = 'EUR'
+      AND pu.energy_unit_code = 'KWH'
+      AND g.entity_type = 'Country'
+    GROUP BY s.year_val, g.country_name
+),
+paired_series AS (
+    SELECT
+        p.anno,
+        p.paese,
+        g.gpr_medio_annuale,
+        p.prezzo_medio_annuale
+    FROM price_by_country_year p
+    JOIN gpr_by_year g ON g.anno = p.anno
+)
+SELECT
+    paese,
+    COUNT(*) AS anni_confrontabili,
+    MIN(anno) AS primo_anno,
+    MAX(anno) AS ultimo_anno,
+    ROUND(CORR(
+        gpr_medio_annuale::DOUBLE PRECISION,
+        prezzo_medio_annuale::DOUBLE PRECISION
+    )::NUMERIC, 3)
+        AS correlazione_pearson_gpr_prezzo
+FROM paired_series
+GROUP BY paese
+HAVING COUNT(*) >= 18
+ORDER BY correlazione_pearson_gpr_prezzo DESC NULLS LAST, paese;
 
 
 -- 2. DRILL-DOWN / ROLL-UP SULLE SCORTE PETROLIFERE D'EMERGENZA
@@ -56,32 +87,38 @@ WHERE g.eurostat_code IN ('IT', 'DE', 'FR', 'ES')
 ORDER BY g.country_name, m.month_sk DESC;
 
 
--- 3. SLICE & DICE: VALUTAZIONE DIPENDENZA ENERGETICA E PREZZI GAS HOUSEHOLD vs NON-HOUSEHOLD
--- Confronta il tasso di dipendenza dalle importazioni energetiche con i prezzi del Gas
--- nelle fasce Eurostat di riferimento D2 (Household) e I3 (Non-Household), entrambi
--- espressi in EUR/kWh ed esclusi IVA e tributi recuperabili.
-SELECT 
-    y.year_value AS anno,
-    g.country_name AS paese,
-    ROUND(AVG(dep.dep_rate_val), 2) AS tasso_dipendenza_import_pct,
-    ROUND(AVG(CASE WHEN p.consumer_type = 'HOUSEHOLD' THEN p.price_val END), 4) AS prezzo_gas_household,
-    ROUND(AVG(CASE WHEN p.consumer_type = 'NON_HOUSEHOLD' THEN p.price_val END), 4) AS prezzo_gas_non_household
-FROM fact_import_dependency dep
-JOIN dt_year y ON dep.year_sk = y.year_sk
-JOIN dim_geo_entity g ON dep.geo_sk = g.geo_sk
-JOIN dt_energy_product prod ON dep.product_sk = prod.product_sk
-LEFT JOIN dt_semester s ON s.year_val = y.year_sk
-LEFT JOIN (
+-- 3. SLICE & DICE: DIPENDENZA ENERGETICA E PREZZI DEL GAS
+-- Confronta annualmente il tasso di dipendenza dalle importazioni con i prezzi
+-- del gas nelle fasce Eurostat D2 (household) e I3 (non-household), in EUR/kWh
+-- con X_VAT. Le due fact vengono aggregate separatamente prima del join.
+WITH dependency_by_year AS (
     SELECT
-        ep.semester_sk,
+        y.year_value AS anno,
+        g.geo_sk,
+        g.country_name AS paese,
+        AVG(dep.dep_rate_val) AS tasso_dipendenza_import_pct
+    FROM fact_import_dependency dep
+    JOIN dt_year y ON y.year_sk = dep.year_sk
+    JOIN dim_geo_entity g ON g.geo_sk = dep.geo_sk
+    JOIN dt_energy_product prod ON prod.product_sk = dep.product_sk
+    WHERE g.entity_type = 'Country'
+      AND prod.siec_code = 'TOTAL'
+    GROUP BY y.year_value, g.geo_sk, g.country_name
+),
+gas_price_by_year AS (
+    SELECT
+        s.year_val AS anno,
         ep.geo_sk,
-        cb.consumer_type,
-        ep.price_val
+        AVG(CASE WHEN cb.consumer_type = 'HOUSEHOLD' THEN ep.price_val END)
+            AS prezzo_gas_household,
+        AVG(CASE WHEN cb.consumer_type = 'NON_HOUSEHOLD' THEN ep.price_val END)
+            AS prezzo_gas_non_household
     FROM fact_energy_price ep
+    JOIN dt_semester s ON s.semester_sk = ep.semester_sk
     JOIN dt_consumption_band cb
-      ON ep.consumption_band_sk = cb.consumption_band_sk
-    JOIN dt_tax_level tl ON ep.tax_level_sk = tl.tax_level_sk
-    JOIN dt_price_unit pu ON ep.price_unit_sk = pu.price_unit_sk
+      ON cb.consumption_band_sk = ep.consumption_band_sk
+    JOIN dt_tax_level tl ON tl.tax_level_sk = ep.tax_level_sk
+    JOIN dt_price_unit pu ON pu.price_unit_sk = ep.price_unit_sk
     WHERE cb.commodity_type = 'GAS'
       AND (
             (cb.consumer_type = 'HOUSEHOLD' AND cb.band_code = 'GJ20-199')
@@ -90,46 +127,50 @@ LEFT JOIN (
       AND tl.tax_code = 'X_VAT'
       AND pu.currency_code = 'EUR'
       AND pu.energy_unit_code = 'KWH'
-) p ON p.semester_sk = s.semester_sk
-   AND p.geo_sk = g.geo_sk
-WHERE g.entity_type = 'Country'
-  AND prod.siec_code = 'TOTAL'
-GROUP BY y.year_value, g.country_name
-HAVING AVG(dep.dep_rate_val) IS NOT NULL
-ORDER BY y.year_value DESC, tasso_dipendenza_import_pct DESC;
+    GROUP BY s.year_val, ep.geo_sk
+)
+SELECT
+    d.anno,
+    d.paese,
+    ROUND(d.tasso_dipendenza_import_pct, 2) AS tasso_dipendenza_import_pct,
+    ROUND(p.prezzo_gas_household, 4) AS prezzo_gas_household,
+    ROUND(p.prezzo_gas_non_household, 4) AS prezzo_gas_non_household
+FROM dependency_by_year d
+LEFT JOIN gas_price_by_year p
+  ON p.anno = d.anno
+ AND p.geo_sk = d.geo_sk
+WHERE p.geo_sk IS NOT NULL
+ORDER BY d.anno DESC, tasso_dipendenza_import_pct DESC, d.paese;
 
 
 -- 4. ANALISI DINAMICA APPARTENENZA UE (TRAMITE TABELLA PONTE BR_GEO_EU_MEMBERSHIP)
--- Calcola la dipendenza energetica media ed i prezzi dell'energia per i soli paesi
--- che erano EFFETTIVAMENTE membri dell'Unione Europea in ciascun specifico anno storico.
--- Il prezzo usa l'Elettricità Non-Household, fascia Eurostat IC, EUR/kWh e X_VAT.
-SELECT 
-    y.year_value AS anno,
-    COUNT(DISTINCT g.geo_sk) AS numero_paesi_membri_ue,
-    ROUND(AVG(dep.dep_rate_val), 2) AS dipendenza_media_membri_ue_pct,
-    ROUND(AVG(p.price_val), 4) AS prezzo_medio_elettricita_ue
-FROM br_geo_eu_membership br
-JOIN dt_year y ON br.year_sk = y.year_sk
-JOIN dim_geo_entity g ON br.geo_sk = g.geo_sk
-LEFT JOIN (
-    SELECT
-        d.year_sk,
-        d.geo_sk,
-        d.dep_rate_val
+-- Aggrega prima le fact a livello paese-anno per evitare duplicazioni tra semestri.
+-- Vengono mantenuti solo gli anni in cui entrambe le metriche sono disponibili,
+-- così il confronto UE è completo e direttamente interpretabile.
+WITH eu_members AS (
+    SELECT br.year_sk, COUNT(DISTINCT br.geo_sk) AS numero_paesi_membri_ue
+    FROM br_geo_eu_membership br
+    GROUP BY br.year_sk
+),
+dependency_country_year AS (
+    SELECT d.year_sk, d.geo_sk, AVG(d.dep_rate_val) AS dipendenza_paese_pct
     FROM fact_import_dependency d
     JOIN dt_energy_product prod ON d.product_sk = prod.product_sk
+    JOIN br_geo_eu_membership br ON br.year_sk = d.year_sk AND br.geo_sk = d.geo_sk
     WHERE prod.siec_code = 'TOTAL'
-) dep ON dep.year_sk = y.year_sk
-     AND dep.geo_sk = g.geo_sk
-LEFT JOIN dt_semester s ON s.year_val = y.year_sk
-LEFT JOIN (
-    SELECT
-        ep.semester_sk,
-        ep.geo_sk,
-        ep.price_val
+    GROUP BY d.year_sk, d.geo_sk
+),
+dependency_eu_year AS (
+    SELECT year_sk, AVG(dipendenza_paese_pct) AS dipendenza_media_membri_ue_pct
+    FROM dependency_country_year
+    GROUP BY year_sk
+),
+price_country_year AS (
+    SELECT s.year_val AS year_sk, ep.geo_sk, AVG(ep.price_val) AS prezzo_paese_elettricita
     FROM fact_energy_price ep
-    JOIN dt_consumption_band cb
-      ON ep.consumption_band_sk = cb.consumption_band_sk
+    JOIN dt_semester s ON ep.semester_sk = s.semester_sk
+    JOIN br_geo_eu_membership br ON br.year_sk = s.year_val AND br.geo_sk = ep.geo_sk
+    JOIN dt_consumption_band cb ON ep.consumption_band_sk = cb.consumption_band_sk
     JOIN dt_tax_level tl ON ep.tax_level_sk = tl.tax_level_sk
     JOIN dt_price_unit pu ON ep.price_unit_sk = pu.price_unit_sk
     WHERE cb.commodity_type = 'ELECTRICITY'
@@ -138,7 +179,22 @@ LEFT JOIN (
       AND tl.tax_code = 'X_VAT'
       AND pu.currency_code = 'EUR'
       AND pu.energy_unit_code = 'KWH'
-) p ON p.semester_sk = s.semester_sk
-   AND p.geo_sk = g.geo_sk
-GROUP BY y.year_value
+    GROUP BY s.year_val, ep.geo_sk
+),
+price_eu_year AS (
+    SELECT year_sk, AVG(prezzo_paese_elettricita) AS prezzo_medio_elettricita_ue
+    FROM price_country_year
+    GROUP BY year_sk
+)
+SELECT y.year_value AS anno,
+       m.numero_paesi_membri_ue,
+       ROUND(d.dipendenza_media_membri_ue_pct, 2) AS dipendenza_media_membri_ue_pct,
+       ROUND(p.prezzo_medio_elettricita_ue, 4) AS prezzo_medio_elettricita_ue
+FROM eu_members m
+JOIN dt_year y ON m.year_sk = y.year_sk
+LEFT JOIN dependency_eu_year d ON d.year_sk = m.year_sk
+LEFT JOIN price_eu_year p ON p.year_sk = m.year_sk
+WHERE d.year_sk IS NOT NULL
+  AND p.year_sk IS NOT NULL
 ORDER BY y.year_value DESC;
+

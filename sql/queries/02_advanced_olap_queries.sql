@@ -28,6 +28,13 @@ WITH price_by_year AS (
       AND g.entity_type = 'Country'
     GROUP BY y.year_value, g.country_name
 ),
+price_with_lag AS (
+    SELECT anno, paese, prezzo_gas_household,
+           LAG(prezzo_gas_household) OVER (
+               PARTITION BY paese ORDER BY anno
+           ) AS prezzo_gas_anno_precedente
+    FROM price_by_year
+),
 gpr_by_year AS (
     SELECT 
         m.year_val AS anno,
@@ -39,26 +46,23 @@ gpr_by_year AS (
       AND m.year_val BETWEEN 2021 AND 2023
     GROUP BY m.year_val
 )
-SELECT 
-    p.anno,
-    p.paese,
-    ROUND(g.gpr_medio, 2) AS gpr_medio_globale,
-    ROUND(p.prezzo_gas_household, 4) AS prezzo_gas,
-    ROUND(
-        CASE 
-            WHEN LAG(p.prezzo_gas_household) OVER (PARTITION BY p.paese ORDER BY p.anno) IS NULL 
-              OR LAG(p.prezzo_gas_household) OVER (PARTITION BY p.paese ORDER BY p.anno) = 0 THEN NULL
-            ELSE ((p.prezzo_gas_household - LAG(p.prezzo_gas_household) OVER (PARTITION BY p.paese ORDER BY p.anno)) 
-                 / LAG(p.prezzo_gas_household) OVER (PARTITION BY p.paese ORDER BY p.anno)) * 100
-        END, 2
-    ) AS variazione_prezzo_pct
-FROM price_by_year p
+SELECT p.anno, p.paese,
+       ROUND(g.gpr_medio, 2) AS gpr_medio_globale,
+       ROUND(p.prezzo_gas_household, 4) AS prezzo_gas,
+       ROUND(CASE
+           WHEN p.prezzo_gas_anno_precedente IS NULL
+             OR p.prezzo_gas_anno_precedente = 0 THEN NULL
+           ELSE ((p.prezzo_gas_household - p.prezzo_gas_anno_precedente)
+                / p.prezzo_gas_anno_precedente) * 100
+       END, 2) AS variazione_prezzo_pct
+FROM price_with_lag p
 JOIN gpr_by_year g ON p.anno = g.anno
 ORDER BY p.paese, p.anno;
 
 
--- 6. RANKING PAESI PER DIPENDENZA ENERGETICA E COPERTURA PREZZI (PERCENT_RANK & DENSE_RANK)
--- Classifica i paesi europei in base alla dipendenza dalle importazioni nel 2024 e calcola il loro rango.
+-- 6. RANKING PAESI PER DIPENDENZA ENERGETICA E PERCENTILE (PERCENT_RANK & DENSE_RANK)
+-- Classifica i paesi europei in base alla dipendenza dalle importazioni nel 2024.
+-- Il percentile crescente assegna il valore più alto ai paesi più dipendenti.
 SELECT 
     g.country_name AS paese,
     ROUND(dep.dep_rate_val, 2) AS tasso_dipendenza_2024_pct,
@@ -71,12 +75,14 @@ JOIN dt_energy_product prod ON dep.product_sk = prod.product_sk
 WHERE y.year_value = 2024
   AND prod.siec_code = 'TOTAL'
   AND g.entity_type = 'Country'
+  AND dep.dep_rate_val IS NOT NULL
 ORDER BY ranking_dipendenza;
 
 
 -- 7. AUTONOMIA DELLE SCORTE PETROLIFERE D'EMERGENZA PER PAESE
 -- Analizza esclusivamente le scorte espresse in giorni equivalenti, senza
 -- aggregarle con consumi, importazioni, livelli minimi o codici di metodo.
+-- Sono considerati gli anni completi 2020-2025; il 2026 è escluso perché parziale.
 SELECT 
     y.year_value AS anno,
     g.country_name AS paese,
@@ -90,7 +96,7 @@ JOIN dim_geo_entity g ON s.geo_sk = g.geo_sk
 JOIN dt_stock_indicator ind ON s.indicator_sk = ind.indicator_sk
 JOIN dt_measure_unit u ON s.measure_unit_sk = u.measure_unit_sk
 WHERE g.entity_type = 'Country'
-  AND y.year_value >= 2020
+  AND y.year_value BETWEEN 2020 AND 2025
   AND ind.indicator_code = 'STK_EUE_DIR'
   AND u.unit_code = 'NR'
 GROUP BY y.year_value, g.country_name
