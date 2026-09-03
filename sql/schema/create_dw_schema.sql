@@ -1,5 +1,8 @@
 -- =========================================================================
--- SCRIPT DDL: Struttura di base del Data Warehouse (Database: energy_gpr_dw)
+-- SCRIPT DDL DEFINITIVO: struttura del Data Warehouse (energy_gpr_dw)
+-- Da eseguire su database vuoto prima degli ETL. Questo file definisce gia il
+-- modello finale: le migrazioni storiche nella stessa cartella non sono parte
+-- del flusso ordinario di consegna.
 -- =========================================================================
 
 -- Schema di staging per i dati grezzi
@@ -73,6 +76,12 @@ CREATE TABLE IF NOT EXISTS FACT_GPR (
     CONSTRAINT ck_gpr_scope_start CHECK (month_sk >= '1985-01')
 );
 
+COMMENT ON TABLE FACT_GPR IS
+    'Monthly global GPR, GPRT and GPRA series; analytical scope starts at 1985-01';
+COMMENT ON COLUMN FACT_GPR.gpr_val IS 'Geopolitical Risk index';
+COMMENT ON COLUMN FACT_GPR.gprt_val IS 'Geopolitical Risk Threats index';
+COMMENT ON COLUMN FACT_GPR.gpra_val IS 'Geopolitical Risk Acts index';
+
 -- Dimensione Prodotto Energetico per la dipendenza dalle importazioni
 CREATE TABLE IF NOT EXISTS DT_ENERGY_PRODUCT (
     product_sk SERIAL PRIMARY KEY,
@@ -94,6 +103,13 @@ CREATE TABLE IF NOT EXISTS FACT_IMPORT_DEPENDENCY (
     dep_rate_val NUMERIC(12, 4) NOT NULL,
     CONSTRAINT uk_dep_year_geo_product UNIQUE (year_sk, geo_sk, product_sk)
 );
+
+COMMENT ON TABLE DT_ENERGY_PRODUCT IS
+    'Energy products in Eurostat SIEC classification used by nrg_ind_id';
+COMMENT ON TABLE FACT_IMPORT_DEPENDENCY IS
+    'Annual energy import-dependency percentage by geography and SIEC product';
+COMMENT ON COLUMN FACT_IMPORT_DEPENDENCY.dep_rate_val IS
+    'Percentage (Eurostat unit PC); non-additive measure';
 
 -- Dimensione Unita di Prezzo (unita energetica + valuta)
 CREATE TABLE IF NOT EXISTS DT_PRICE_UNIT (
@@ -147,6 +163,13 @@ CREATE TABLE IF NOT EXISTS FACT_ENERGY_PRICE (
     )
 );
 
+COMMENT ON TABLE DT_CONSUMPTION_BAND IS
+    'Eurostat consumption bands with consumer and energy commodity hierarchy';
+COMMENT ON TABLE DT_TAX_LEVEL IS
+    'Eurostat tax inclusion levels for energy prices';
+COMMENT ON TABLE FACT_ENERGY_PRICE IS
+    'Half-yearly energy prices by geography, consumption band, tax level and price unit';
+
 -- Dimensione degli indicatori quantitativi di sicurezza petrolifera
 CREATE TABLE IF NOT EXISTS DT_STOCK_INDICATOR (
     indicator_sk SERIAL PRIMARY KEY,
@@ -166,12 +189,17 @@ CREATE TABLE IF NOT EXISTS DT_MEASURE_UNIT (
 -- 4. Tabella dei Fatti: Indicatori quantitativi di sicurezza petrolifera (Mensile)
 CREATE TABLE IF NOT EXISTS FACT_OIL_STOCKS (
     stock_fact_id SERIAL PRIMARY KEY,
-    month_sk VARCHAR(10) REFERENCES DT_MONTH(month_sk),
-    geo_sk INT REFERENCES DIM_GEO_ENTITY(geo_sk),
-    indicator_sk INT REFERENCES DT_STOCK_INDICATOR(indicator_sk),
-    measure_unit_sk INT REFERENCES DT_MEASURE_UNIT(measure_unit_sk),
+    month_sk VARCHAR(10) NOT NULL REFERENCES DT_MONTH(month_sk),
+    geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
+    indicator_sk INT NOT NULL REFERENCES DT_STOCK_INDICATOR(indicator_sk),
+    measure_unit_sk INT NOT NULL REFERENCES DT_MEASURE_UNIT(measure_unit_sk),
     compliance_status VARCHAR(50),
     eurostat_flag VARCHAR(20),
-    indicator_value NUMERIC(14, 4),      -- Misura non additiva; confrontare solo lo stesso indicatore/unita
+    indicator_value NUMERIC(14, 4) NOT NULL,
     CONSTRAINT uk_oil_stocks UNIQUE (month_sk, geo_sk, indicator_sk, measure_unit_sk)
 );
+
+COMMENT ON TABLE FACT_OIL_STOCKS IS
+    'Monthly quantitative oil-security indicators; non-additive measure';
+COMMENT ON COLUMN FACT_OIL_STOCKS.indicator_value IS
+    'Non-additive measure; aggregate only within the same indicator and unit';

@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 import pandas as pd
 
-# Percorso della cartella contenente i file raw di Eurostat
-eurostat_dir = "Dataset/raw/eurostat"
+# Percorso della cartella contenente i file raw di Eurostat.
+project_dir = Path(__file__).resolve().parents[2]
+eurostat_dir = project_dir / "data" / "raw" / "eurostat"
 
 # Lista dei file TSV Eurostat da profilare
 eurostat_files = [
@@ -17,7 +19,7 @@ eurostat_files = [
 print("=== AVVIO PROFILING DATASET EUROSTAT ===\n")
 
 for filename in eurostat_files:
-  file_path = os.path.join(eurostat_dir, filename)
+  file_path = eurostat_dir / filename
 
   if not os.path.exists(file_path):
     print(f"[ATTENZIONE] File non trovato: {filename}")

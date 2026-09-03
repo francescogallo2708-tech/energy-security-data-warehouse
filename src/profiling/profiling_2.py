@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 import pandas as pd
 
-# Percorso del file GPR
-gpr_file_path = "Dataset/raw/gpr/data_gpr_export_202608.xls"
+# Percorso del file GPR, risolto rispetto alla radice del repository.
+project_dir = Path(__file__).resolve().parents[2]
+gpr_file_path = project_dir / "data" / "raw" / "gpr" / "data_gpr_export_202608.xls"
 
 print("=== AVVIO PROFILING DATASET GEOPOLITICAL RISK (GPR) ===\n")
 

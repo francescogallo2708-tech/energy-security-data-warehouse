@@ -6,10 +6,13 @@ from psycopg2.extras import execute_values
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
-    'password': os.environ.get('PGPASSWORD') or getpass.getpass('Password PostgreSQL: '),
     'host': os.environ.get('PGHOST', 'localhost'),
-    'port': os.environ.get('PGPORT', '5433')
+    'port': os.environ.get('PGPORT', '5432')
 }
+if os.environ.get('PGPASSWORD'):
+    DB_CONFIG['password'] = os.environ['PGPASSWORD']
+elif not os.environ.get('PGPASSFILE'):
+    DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 def load_time_dimensions():
     print("--- AVVIO POPOLAMENTO DIMENSIONI TEMPORALI ---")

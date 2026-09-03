@@ -9,7 +9,7 @@ DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
     'host': os.environ.get('PGHOST', 'localhost'),
-    'port': os.environ.get('PGPORT', '5433')
+    'port': os.environ.get('PGPORT', '5432')
 }
 if os.environ.get('PGPASSWORD'):
     DB_CONFIG['password'] = os.environ['PGPASSWORD']

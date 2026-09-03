@@ -6,7 +6,7 @@
 ---
 
 ## 1. Introduzione e Obiettivi
-Questo documento raccoglie le evidenze emerse durante la fase di data profiling dei dataset grezzi acquisiti (`data/raw/`). L'obiettivo è validare la struttura formale, identificare le criticità di formattazione (es. separatori complessi, formati wide/long) e definire le regole di trasformazione necessarie per la successiva fase di ETL (Extract, Transform, Load) verso le tabelle di staging e le dimensioni del Data Warehouse.
+Questo documento raccoglie le evidenze emerse durante la fase di data profiling dei dataset grezzi acquisiti (`data/raw/`). L'obiettivo è validare la struttura formale, identificare le criticità di formattazione (es. separatori complessi, formati wide/long) e definire le regole di trasformazione necessarie per la successiva fase ETL verso dimensioni e fact table del Data Warehouse.
 
 ---
 
@@ -38,7 +38,7 @@ Questo documento raccoglie le evidenze emerse durante la fase di data profiling 
 ---
 
 ## 4. Indicazioni per le Fasi Successive (ETL e Staging)
-1. **Creazione Staging Area:** Implementare tabelle di staging intermedie che rispecchino fedelmente i file raw grezzi, evitando blocchi in fase di lettura.
+1. **Preparazione ETL:** trasformare i file raw wide in record long, validare codici e flag e caricare direttamente dimensioni e fact table.
 2. **Normalizzazione Geografica:** Prima di popolare le Fact Table, sarà indispensabile completare la tabella di mapping comune per risolvere disallineamenti di codifica (es. codici a 2 caratteri Eurostat vs codici ISO o GPR).
 3. **Popolamento Dimensioni:** Procedere rigorosamente al caricamento preventivo delle dimensioni temporali (`DT_MONTH`, `DT_SEMESTER`, `DT_YEAR`), geografiche (`DT_GEO_ENTITY`) e di dominio (`DT_PRICE_UNIT`, `DT_RISK_SERIES`) prima di alimentare le tabelle dei fatti.
 
