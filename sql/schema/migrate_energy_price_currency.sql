@@ -1,5 +1,0 @@
--- DEPRECATO: questa migrazione e stata sostituita da
--- sql/schema/migrate_energy_price_dimensions.sql.
---
--- Non contiene piu istruzioni eseguibili per evitare che l'esecuzione
--- accidentale ripristini la vecchia struttura di FACT_ENERGY_PRICE.
