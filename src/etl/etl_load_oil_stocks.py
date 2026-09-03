@@ -19,13 +19,31 @@ elif not os.environ.get('PGPASSFILE'):
     DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 STOCK_INDICATORS = {
-    'IC_DC': ('Closing stock level', 'Stock level', None),
-    'IMP_DNC': ('Net imports', 'Import flow', None),
-    'STK_EUE_DIR': ('Emergency stocks under EU directive', 'Emergency stock', 'EU directive'),
-    'STK_EUE_DNY_MTH': ('Days of net imports covered by emergency stocks', 'Emergency stock coverage', 'Days/months'),
-    'STK_EUE_MIN_MTH': ('Minimum emergency stock obligation in months', 'Emergency stock obligation', 'Minimum months'),
-    'STK_EUE_MTH': ('Emergency stocks in months of consumption', 'Emergency stock coverage', 'Months'),
-    'STK_MIN_CAL': ('Minimum stock obligation calendar days', 'Emergency stock obligation', 'Calendar days'),
+    'IC_DC': ('Daily inland consumption for compliance', 'Compliance consumption', 'Compliance'),
+    'IMP_DNC': ('Daily net imports for compliance', 'Compliance import flow', 'Compliance'),
+    'STK_EUE_DIR': (
+        'Emergency stocks held under EU Directive (days equivalent)',
+        'Emergency stock',
+        'EU Directive'
+    ),
+    'STK_MIN_CAL': (
+        'Minimum stock level for compliance - calculated',
+        'Minimum stock requirement',
+        'Compliance'
+    ),
+}
+
+EXPECTED_UNITS = {
+    'IC_DC': 'THS_T',
+    'IMP_DNC': 'THS_T',
+    'STK_EUE_DIR': 'NR',
+    'STK_MIN_CAL': 'THS_T',
+}
+
+EXCLUDED_METHOD_INDICATORS = {
+    'STK_EUE_DNY_MTH',
+    'STK_EUE_MIN_MTH',
+    'STK_EUE_MTH',
 }
 
 MEASURE_UNITS = {
@@ -78,9 +96,17 @@ def load_oil_stocks_fact():
         )
 
         df_long['clean_val'] = df_long['raw_val'].astype(str).str.replace(r'[^\d.-]', '', regex=True)
-        df_long['stock_value'] = pd.to_numeric(df_long['clean_val'], errors='coerce')
+        df_long['indicator_value'] = pd.to_numeric(df_long['clean_val'], errors='coerce')
         df_long['eurostat_flag'] = df_long['raw_val'].apply(extract_flag)
-        df_valid = df_long.dropna(subset=['stock_value']).copy()
+        df_valid = df_long.dropna(subset=['indicator_value']).copy()
+
+        excluded_method_rows = int(
+            df_valid['stk_flow'].isin(EXCLUDED_METHOD_INDICATORS).sum()
+        )
+        print(
+            'Record categorici relativi ai metodi esclusi dalla fact: '
+            f'{excluded_method_rows}'
+        )
 
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -129,8 +155,9 @@ def load_oil_stocks_fact():
 
         df_filtered = df_valid[
             df_valid['geo'].isin(geo_map)
-            & df_valid['stk_flow'].isin(indicator_map)
+            & df_valid['stk_flow'].isin(STOCK_INDICATORS)
             & df_valid['unit'].isin(unit_map)
+            & df_valid['unit'].eq(df_valid['stk_flow'].map(EXPECTED_UNITS))
             & df_valid['month_sk'].isin(valid_months)
         ].copy()
 
@@ -150,7 +177,7 @@ def load_oil_stocks_fact():
                 int(row['measure_unit_sk']),
                 row['compliance_status'],
                 row['eurostat_flag'],
-                float(row['stock_value'])
+                float(row['indicator_value'])
             )
             for _, row in df_dedup.iterrows()
         ]
@@ -161,12 +188,12 @@ def load_oil_stocks_fact():
             cursor,
             """
             INSERT INTO FACT_OIL_STOCKS
-            (month_sk, geo_sk, indicator_sk, measure_unit_sk, compliance_status, eurostat_flag, stock_value)
+            (month_sk, geo_sk, indicator_sk, measure_unit_sk, compliance_status, eurostat_flag, indicator_value)
             VALUES %s
             ON CONFLICT (month_sk, geo_sk, indicator_sk, measure_unit_sk) DO UPDATE SET
                 compliance_status = EXCLUDED.compliance_status,
                 eurostat_flag = EXCLUDED.eurostat_flag,
-                stock_value = EXCLUDED.stock_value;
+                indicator_value = EXCLUDED.indicator_value;
             """,
             tuples_to_insert
         )
