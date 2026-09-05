@@ -1,11 +1,11 @@
 -- =========================================================================
--- SCRIPT DDL DEFINITIVO: struttura del Data Warehouse (energy_gpr_dw)
--- Da eseguire su database vuoto prima degli ETL. Questo file definisce gia il
--- modello finale: le migrazioni storiche nella stessa cartella non sono parte
--- del flusso ordinario di consegna.
+-- FINAL DDL SCRIPT: Energy Security Data Warehouse structure (energy_gpr_dw)
+-- Run on an empty database before the ETLs. This file defines the final model:
+-- historical migrations in the same directory are not part of the standard
+-- delivery workflow.
 -- =========================================================================
 
--- Tabella Dimensione Geografica Comune
+-- Shared geographic dimension
 CREATE TABLE IF NOT EXISTS DIM_GEO_ENTITY (
     geo_sk SERIAL PRIMARY KEY,
     eurostat_code VARCHAR(30) UNIQUE NOT NULL,
@@ -16,27 +16,27 @@ CREATE TABLE IF NOT EXISTS DIM_GEO_ENTITY (
     is_eu BOOLEAN DEFAULT FALSE
 );
 
--- Dimensione Temporale Annuale
+-- Annual time dimension
 CREATE TABLE IF NOT EXISTS DT_YEAR (
     year_sk INT PRIMARY KEY,
     year_value INT UNIQUE NOT NULL
 );
 
--- Dimensione Temporale Semestrale
+-- Semester time dimension
 CREATE TABLE IF NOT EXISTS DT_SEMESTER (
-    semester_sk VARCHAR(10) PRIMARY KEY, -- es. '2007-S1'
+    semester_sk VARCHAR(10) PRIMARY KEY, -- e.g., '2007-S1'
     year_val INT NOT NULL,
     semester_num INT NOT NULL
 );
 
--- Dimensione Temporale Mensile
+-- Monthly time dimension
 CREATE TABLE IF NOT EXISTS DT_MONTH (
-    month_sk VARCHAR(10) PRIMARY KEY, -- es. '2013-01'
+    month_sk VARCHAR(10) PRIMARY KEY, -- e.g., '2013-01'
     year_val INT NOT NULL,
     month_num INT NOT NULL
 );
 
--- Tabella Ponte per la storicizzazione dell'appartenenza UE
+-- Bridge table for historical EU membership
 CREATE TABLE IF NOT EXISTS BR_GEO_EU_MEMBERSHIP (
     geo_sk INT REFERENCES DIM_GEO_ENTITY(geo_sk),
     year_sk INT REFERENCES DT_YEAR(year_sk),
@@ -44,10 +44,10 @@ CREATE TABLE IF NOT EXISTS BR_GEO_EU_MEMBERSHIP (
 );
 
 -- =========================================================================
--- TABELLE DEI FATTI (FACT TABLES)
+-- FACT TABLES
 -- =========================================================================
 
--- 1. Tabella dei Fatti: Rischio Geopolitico Mensile
+-- 1. Fact table: monthly geopolitical risk
 CREATE TABLE IF NOT EXISTS FACT_GPR (
     month_sk VARCHAR(10) NOT NULL REFERENCES DT_MONTH(month_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
@@ -64,7 +64,7 @@ COMMENT ON COLUMN FACT_GPR.gpr_val IS 'Geopolitical Risk index';
 COMMENT ON COLUMN FACT_GPR.gprt_val IS 'Geopolitical Risk Threats index';
 COMMENT ON COLUMN FACT_GPR.gpra_val IS 'Geopolitical Risk Acts index';
 
--- Dimensione Prodotto Energetico per la dipendenza dalle importazioni
+-- Energy-product dimension for import dependency
 CREATE TABLE IF NOT EXISTS DT_ENERGY_PRODUCT (
     product_sk SERIAL PRIMARY KEY,
     siec_code VARCHAR(30) UNIQUE NOT NULL,
@@ -73,9 +73,9 @@ CREATE TABLE IF NOT EXISTS DT_ENERGY_PRODUCT (
     is_total BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- 2. Tabella dei Fatti: Dipendenza dall'Importazione Energetica (Annuale)
--- La sorgente nrg_ind_id usa esclusivamente l'unita PC (percentuale),
--- validata dall'ETL e quindi implicita nella misura dep_rate_val.
+-- 2. Fact table: annual energy import dependency
+-- Source nrg_ind_id uses only PC (percentage) as its unit, validated by the
+-- ETL and therefore implicit in the dep_rate_val measure.
 CREATE TABLE IF NOT EXISTS FACT_IMPORT_DEPENDENCY (
     year_sk INT NOT NULL REFERENCES DT_YEAR(year_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
@@ -92,7 +92,7 @@ COMMENT ON TABLE FACT_IMPORT_DEPENDENCY IS
 COMMENT ON COLUMN FACT_IMPORT_DEPENDENCY.dep_rate_val IS
     'Percentage (Eurostat unit PC); non-additive measure';
 
--- Dimensione Unita di Prezzo (unita energetica + valuta)
+-- Price-unit dimension (energy unit + currency)
 CREATE TABLE IF NOT EXISTS DT_PRICE_UNIT (
     price_unit_sk SERIAL PRIMARY KEY,
     energy_unit_code VARCHAR(30) NOT NULL,
@@ -103,21 +103,21 @@ CREATE TABLE IF NOT EXISTS DT_PRICE_UNIT (
     CONSTRAINT uk_price_unit UNIQUE (energy_unit_code, currency_code)
 );
 
--- Dimensione Fascia di Consumo (classificata per consumatore e commodity)
+-- Consumption-band dimension (classified by consumer and commodity)
 CREATE TABLE IF NOT EXISTS DT_CONSUMPTION_BAND (
     consumption_band_sk SERIAL PRIMARY KEY,
-    commodity_type VARCHAR(20) NOT NULL,  -- 'GAS' o 'ELECTRICITY'
-    siec_code VARCHAR(20) NOT NULL,        -- G3000 o E7000
+    commodity_type VARCHAR(20) NOT NULL,  -- 'GAS' or 'ELECTRICITY'
+    siec_code VARCHAR(20) NOT NULL,        -- G3000 or E7000
     siec_label VARCHAR(100) NOT NULL,
-    consumer_type VARCHAR(20) NOT NULL,   -- 'HOUSEHOLD' o 'NON_HOUSEHOLD'
-    band_code VARCHAR(50) NOT NULL,       -- Codice NRG_CONS Eurostat
+    consumer_type VARCHAR(20) NOT NULL,   -- 'HOUSEHOLD' or 'NON_HOUSEHOLD'
+    band_code VARCHAR(50) NOT NULL,       -- Eurostat NRG_CONS code
     band_label VARCHAR(250) NOT NULL,
     band_order SMALLINT NOT NULL,
     is_total_band BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT uk_consumption_band UNIQUE (commodity_type, consumer_type, band_code)
 );
 
--- Dimensione Livello di Tassazione
+-- Tax-level dimension
 CREATE TABLE IF NOT EXISTS DT_TAX_LEVEL (
     tax_level_sk SERIAL PRIMARY KEY,
     tax_code VARCHAR(20) UNIQUE NOT NULL,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS DT_TAX_LEVEL (
     tax_inclusion_order SMALLINT NOT NULL
 );
 
--- 3. Tabella dei Fatti: Prezzi dell'Energia (Semestrale)
+-- 3. Fact table: half-yearly energy prices
 CREATE TABLE IF NOT EXISTS FACT_ENERGY_PRICE (
     semester_sk VARCHAR(10) NOT NULL REFERENCES DT_SEMESTER(semester_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS FACT_ENERGY_PRICE (
     tax_level_sk INT NOT NULL REFERENCES DT_TAX_LEVEL(tax_level_sk),
     price_unit_sk INT NOT NULL REFERENCES DT_PRICE_UNIT(price_unit_sk),
     eurostat_flag VARCHAR(20),
-    price_val NUMERIC(10, 4) NOT NULL,   -- Prezzo finale
+    price_val NUMERIC(10, 4) NOT NULL,   -- Final price
     CONSTRAINT pk_fact_energy_price PRIMARY KEY (
         semester_sk,
         geo_sk,
@@ -150,7 +150,7 @@ COMMENT ON TABLE DT_TAX_LEVEL IS
 COMMENT ON TABLE FACT_ENERGY_PRICE IS
     'Half-yearly energy prices by geography, consumption band, tax level and price unit';
 
--- Dimensione degli indicatori quantitativi di sicurezza petrolifera
+-- Quantitative oil-security indicator dimension
 CREATE TABLE IF NOT EXISTS DT_STOCK_INDICATOR (
     indicator_sk SERIAL PRIMARY KEY,
     indicator_code VARCHAR(50) UNIQUE NOT NULL,
@@ -159,14 +159,14 @@ CREATE TABLE IF NOT EXISTS DT_STOCK_INDICATOR (
     obligation_basis VARCHAR(100)
 );
 
--- Dimensione Unita di Misura
+-- Measurement-unit dimension
 CREATE TABLE IF NOT EXISTS DT_MEASURE_UNIT (
     measure_unit_sk SERIAL PRIMARY KEY,
     unit_code VARCHAR(30) UNIQUE NOT NULL,
     unit_label VARCHAR(100)
 );
 
--- 4. Tabella dei Fatti: Indicatori quantitativi di sicurezza petrolifera (Mensile)
+-- 4. Fact table: monthly quantitative oil-security indicators
 CREATE TABLE IF NOT EXISTS FACT_OIL_STOCKS (
     month_sk VARCHAR(10) NOT NULL REFERENCES DT_MONTH(month_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),

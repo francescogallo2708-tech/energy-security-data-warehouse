@@ -15,21 +15,21 @@ elif not os.environ.get('PGPASSFILE'):
     DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 def load_time_dimensions():
-    print("--- AVVIO POPOLAMENTO DIMENSIONI TEMPORALI ---")
+    print("--- STARTING TIME-DIMENSION LOADING ---")
     
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # 1. Popolamento DT_YEAR (es. dal 1990 al 2030)
+        # 1. Load DT_YEAR (e.g., from 1900 to 2030)
         years_tuples = [(y, y) for y in range(1900, 2031)]
         cursor.executemany(
             "INSERT INTO DT_YEAR (year_sk, year_value) VALUES (%s, %s) ON CONFLICT (year_sk) DO NOTHING;",
             years_tuples
         )
-        print(f"  - Inseriti anni dal 1900 al 2030.")
+        print("  - Inserted years from 1900 to 2030.")
 
-        # 2. Popolamento DT_SEMESTER (es. dal 2007 al 2026)
+        # 2. Load DT_SEMESTER (e.g., from 2007 to 2026)
         semesters_tuples = []
         for year in range(2007, 2027):
             for sem in [1, 2]:
@@ -40,13 +40,13 @@ def load_time_dimensions():
             "INSERT INTO DT_SEMESTER (semester_sk, year_val, semester_num) VALUES (%s, %s, %s) ON CONFLICT (semester_sk) DO NOTHING;",
             semesters_tuples
         )
-        print(f"  - Inseriti semestri dal 2007 al 2026.")
+        print("  - Inserted semesters from 2007 to 2026.")
 
-        # 3. Popolamento DT_MONTH (es. dal 1900 al 2026)
+        # 3. Load DT_MONTH (e.g., from 1900 to 2026)
         months_tuples = []
         for year in range(1900, 2027):
             for month in range(1, 13):
-                month_sk = f"{year}-{month:02d}" # es. '2026-08'
+                month_sk = f"{year}-{month:02d}"  # e.g., '2026-08'
                 months_tuples.append((month_sk, year, month))
         
         execute_values(
@@ -54,18 +54,18 @@ def load_time_dimensions():
             "INSERT INTO DT_MONTH (month_sk, year_val, month_num) VALUES %s ON CONFLICT (month_sk) DO NOTHING;",
             months_tuples
         )
-        print(f"  - Inseriti mesi dal 1900 al 2026.")
+        print("  - Inserted months from 1900 to 2026.")
 
         conn.commit()
-        print("[SUCCESSO] Tutte le dimensioni temporali sono state popolate correttamente.")
+        print("[SUCCESS] All time dimensions were loaded successfully.")
 
     except Exception as e:
-        print(f"[ERRORE] Popolamento temporale fallito: {e}")
+        print(f"[ERROR] Time-dimension loading failed: {e}")
         raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()
-        print("--- FINE POPOLAMENTO TEMPORALE ---")
+        print("--- TIME-DIMENSION LOADING COMPLETED ---")
 
 if __name__ == "__main__":
     load_time_dimensions()

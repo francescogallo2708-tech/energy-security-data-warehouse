@@ -59,7 +59,7 @@ def extract_flag(raw_value):
 
 
 def load_oil_stocks_fact():
-    print("--- AVVIO ETL FACT_OIL_STOCKS ---")
+    print("--- STARTING FACT_OIL_STOCKS ETL ---")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
@@ -69,13 +69,13 @@ def load_oil_stocks_fact():
     )
 
     if not os.path.exists(tsv_file):
-        raise FileNotFoundError(f"File {tsv_file} non trovato.")
+        raise FileNotFoundError(f"File not found: {tsv_file}.")
 
-    print(f"Trovato file sorgente: {tsv_file}")
+    print(f"Found source file: {tsv_file}")
 
     try:
         df_raw = pd.read_csv(tsv_file, sep='\t', low_memory=False)
-        print(f"File caricato. Righe grezze: {len(df_raw)}")
+        print(f"File loaded. Raw rows: {len(df_raw)}")
 
         first_col = df_raw.columns[0]
         df_split = df_raw[first_col].str.split(',', expand=True)
@@ -86,7 +86,7 @@ def load_oil_stocks_fact():
 
         month_cols = [c for c in df_data.columns if re.match(r'^\d{4}-\d{2}$', c)]
         if not month_cols:
-            raise ValueError('Nessuna colonna mensile YYYY-MM trovata nel file Oil Stocks.')
+            raise ValueError('No YYYY-MM monthly column found in the Oil Stocks file.')
 
         df_long = pd.melt(
             df_data,
@@ -105,7 +105,7 @@ def load_oil_stocks_fact():
             df_valid['stk_flow'].isin(EXCLUDED_METHOD_INDICATORS).sum()
         )
         print(
-            'Record categorici relativi ai metodi esclusi dalla fact: '
+            'Categorical records related to methods excluded from the fact table: '
             f'{excluded_method_rows}'
         )
 
@@ -165,7 +165,7 @@ def load_oil_stocks_fact():
             & quantitative_rows['month_sk'].isin(valid_months)
         )
         unexpected_rows = quantitative_rows.loc[~supported_rows]
-        print(f'Record quantitativi inattesi: {len(unexpected_rows)}')
+        print(f'Unexpected quantitative records: {len(unexpected_rows)}')
         if not unexpected_rows.empty:
             sample = (
                 unexpected_rows[['stk_flow', 'unit', 'geo', 'month_sk']]
@@ -174,8 +174,8 @@ def load_oil_stocks_fact():
                 .to_dict('records')
             )
             raise ValueError(
-                'Il file Oil Stocks contiene record quantitativi non riconosciuti. '
-                f'Esempio: {sample}'
+                'The Oil Stocks file contains unrecognized quantitative records. '
+                f'Sample: {sample}'
             )
 
         df_filtered = quantitative_rows.loc[supported_rows].copy()
@@ -194,8 +194,8 @@ def load_oil_stocks_fact():
                 .to_dict('records')
             )
             raise ValueError(
-                'Il file Oil Stocks contiene duplicati alla grana della fact. '
-                f'Esempio: {duplicate_sample}'
+                'The Oil Stocks file contains duplicates at the fact-table grain. '
+                f'Sample: {duplicate_sample}'
             )
 
         tuples_to_insert = [
@@ -210,13 +210,13 @@ def load_oil_stocks_fact():
             for _, row in df_filtered.iterrows()
         ]
 
-        print(f"Record pronti per l'inserimento: {len(tuples_to_insert)}")
+        print(f"Records ready for insertion: {len(tuples_to_insert)}")
         if not tuples_to_insert:
-            raise ValueError('Nessun record quantitativo valido da caricare in FACT_OIL_STOCKS.')
+            raise ValueError('No valid quantitative record is available for loading into FACT_OIL_STOCKS.')
 
-        # Full refresh: evita di mantenere righe obsolete quando la sorgente
-        # viene aggiornata. Il DELETE e l'INSERT appartengono alla stessa
-        # transazione e vengono annullati insieme in caso di errore.
+        # Full refresh: avoids retaining obsolete rows when the source is
+        # updated. DELETE and INSERT belong to the same transaction and are
+        # rolled back together if an error occurs.
         cursor.execute("DELETE FROM FACT_OIL_STOCKS;")
 
         execute_values(
@@ -231,19 +231,19 @@ def load_oil_stocks_fact():
         )
 
         conn.commit()
-        print(f"[SUCCESSO] Inseriti/Aggiornati {len(tuples_to_insert)} record nella tabella FACT_OIL_STOCKS.")
+        print(f"[SUCCESS] Inserted/updated {len(tuples_to_insert)} records in FACT_OIL_STOCKS.")
 
     except Exception as e:
         if 'conn' in locals():
             conn.rollback()
-        print(f"[ERRORE] Durante l'ETL Oil Stocks: {e}")
+        print(f"[ERROR] FACT_OIL_STOCKS ETL failed: {e}")
         raise
     finally:
         if 'cursor' in locals():
             cursor.close()
         if 'conn' in locals():
             conn.close()
-        print("--- FINE ETL FACT_OIL_STOCKS ---")
+        print("--- FACT_OIL_STOCKS ETL COMPLETED ---")
 
 
 if __name__ == "__main__":

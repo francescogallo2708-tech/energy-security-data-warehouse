@@ -25,14 +25,14 @@ $etlScripts = @(
 )
 
 Write-Host "Database: $Database on $HostName`:$Port"
-Write-Host "Eseguire prima sql/schema/create_dw_schema.sql su un database vuoto."
+Write-Host "Run sql/schema/create_dw_schema.sql first on an empty database."
 
 foreach ($etl in $etlScripts) {
     Write-Host "`n>>> python $etl"
     & python $etl
     if ($LASTEXITCODE -ne 0) {
-        throw "ETL fallito: $etl"
+        throw "ETL failed: $etl"
     }
 }
 
-Write-Host "`nWorkflow ETL completato. Eseguire ora sql/schema/verify_final_dw.sql e le due query OLAP."
+Write-Host "`nETL workflow completed. Now run sql/schema/verify_final_dw.sql and the OLAP queries."

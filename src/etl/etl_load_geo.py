@@ -4,7 +4,7 @@ import os
 import psycopg2
 from psycopg2.extras import execute_values
 
-# Configurazione della connessione al database PostgreSQL
+# PostgreSQL connection configuration
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
@@ -17,9 +17,9 @@ elif not os.environ.get('PGPASSFILE'):
     DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
 def load_geography_dimension():
-    print("--- AVVIO POPOLAMENTO DIM_GEO_ENTITY ---")
+    print("--- STARTING DIM_GEO_ENTITY LOADING ---")
     
-    # Dati geografici unificati
+    # Consolidated geographic data
     geo_data = [
         {"eurostat": "AL", "iso2": "AL", "iso3": "ALB", "name": "Albania", "type": "Country", "eu": False},
         {"eurostat": "AT", "iso2": "AT", "iso3": "AUT", "name": "Austria", "type": "Country", "eu": True},
@@ -86,7 +86,7 @@ def load_geography_dimension():
                 is_eu = EXCLUDED.is_eu;
         """
         
-        # Mappatura esatta delle tuple (gestendo i valori None per convertirli in NULL di SQL)
+        # Map tuples explicitly, converting None values to SQL NULL.
         tuples = [
             (
                 row['eurostat'], 
@@ -102,15 +102,15 @@ def load_geography_dimension():
         execute_values(cursor, insert_query, tuples)
         conn.commit()
         
-        print(f"[SUCCESSO] Inseriti/Aggiornati {len(tuples)} record nella tabella DIM_GEO_ENTITY.")
+        print(f"[SUCCESS] Inserted/updated {len(tuples)} records in DIM_GEO_ENTITY.")
         
     except Exception as e:
-        print(f"[ERRORE] Connessione o inserimento fallito: {e}")
+        print(f"[ERROR] Connection or insert failed: {e}")
         raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()
-        print("--- FINE POPOLAMENTO GEOGRAFIA ---")
+        print("--- DIM_GEO_ENTITY LOADING COMPLETED ---")
 
 if __name__ == "__main__":
     load_geography_dimension()

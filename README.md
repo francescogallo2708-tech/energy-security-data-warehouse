@@ -1,118 +1,116 @@
 # Energy Security Data Warehouse
 
-Data warehouse analitico per lo studio congiunto della sicurezza energetica
-europea e del rischio geopolitico. Il progetto integra il Geopolitical Risk
-Index (GPR) e dataset Eurostat relativi a dipendenza dalle importazioni, prezzi
-dell'energia e scorte petrolifere di emergenza.
+An analytical data warehouse for the joint study of European energy security
+and geopolitical risk. The project integrates the Geopolitical Risk Index (GPR)
+with Eurostat datasets on import dependency, energy prices, and emergency oil
+stocks.
 
-## Contenuto del repository
+## Repository contents
 
 ```text
 docs/
-├── proposal/                    proposta approvata
-├── data-sources/                fonti, metadati e criteri di trasformazione
-├── modeling/dfm/                quattro DFM definitivi in PNG
-├── modeling/star-schema/        quattro Star Schema definitivi in PNG
-└── results/                     CSV e figure per la presentazione
+├── proposal/                    approved proposal
+├── data-sources/                sources, metadata, and transformation criteria
+├── modeling/dfm/                four final DFM diagrams in PNG format
+├── modeling/star-schema/        four final Star Schema diagrams in PNG format
+└── results/                     CSV files and presentation figures
 
-data/raw/                        snapshot versionati delle sorgenti usate dagli ETL
-data/processed/                  area riservata a eventuali output trasformati persistenti
-src/profiling/                   analisi esplorativa delle sorgenti
-src/etl/                         script Python di caricamento
-sql/schema/                      DDL definitivo e verifiche
-sql/queries/                     query OLAP base e avanzate
-scripts/run_etl.ps1              esecuzione ordinata degli ETL
-requirements.txt                 dipendenze Python per i grafici
+data/raw/                        versioned source snapshots used by the ETL
+data/processed/                  reserved area for possible persistent transformed outputs
+src/profiling/                   exploratory source-data analysis
+src/etl/                         Python loading scripts
+sql/schema/                      final DDL and validation checks
+sql/queries/                     business and advanced OLAP queries
+scripts/run_etl.ps1              ordered ETL execution
+requirements.txt                 Python dependencies for the charts
 ```
 
-## Architettura
+## Architecture
 
-Il modello è una costellazione di quattro fact table, ciascuna mantenuta alla
-granularità nativa della fonte:
+The model is a constellation of four fact tables, each preserved at the native
+granularity of its source:
 
-- `FACT_GPR`: indicatori GPR mensili;
-- `FACT_IMPORT_DEPENDENCY`: dipendenza energetica annuale;
-- `FACT_ENERGY_PRICE`: prezzi dell'energia semestrali;
-- `FACT_OIL_STOCKS`: scorte petrolifere mensili espresse in giorni equivalenti.
+- `FACT_GPR`: monthly GPR indicators;
+- `FACT_IMPORT_DEPENDENCY`: annual energy import dependency;
+- `FACT_ENERGY_PRICE`: half-yearly energy prices;
+- `FACT_OIL_STOCKS`: monthly oil stocks expressed in days of equivalent consumption.
 
-In ciascuna fact table la grana è formalizzata da una chiave primaria composta
-dalle chiavi esterne delle relative dimensioni, secondo la traduzione
-DFM-to-Star Schema adottata nel corso.
+For each fact table, the grain is enforced through a composite primary key made
+of the foreign keys to the relevant dimensions, following the DFM-to-Star
+Schema translation adopted in the course.
 
-Le dimensioni temporali sono separate in `DT_MONTH`, `DT_SEMESTER` e `DT_YEAR`.
-`DIM_GEO_ENTITY` è condivisa dai processi e
-`BR_GEO_EU_MEMBERSHIP` rappresenta l'appartenenza storica all'Unione Europea.
-I diagrammi DFM e Star Schema sono disponibili in `docs/modeling/`.
+The time dimensions are separated into `DT_MONTH`, `DT_SEMESTER`, and `DT_YEAR`.
+`DIM_GEO_ENTITY` is shared across processes, while
+`BR_GEO_EU_MEMBERSHIP` represents historical European Union membership. The DFM
+and Star Schema diagrams are available in `docs/modeling/`.
 
-Le misure di rischio, dipendenza e prezzo sono non additive: vengono aggregate
-solo in contesti omogenei con `AVG`, `MIN` o `MAX`. Le scorte sono level measure
-e non vengono sommate nel tempo. I flag Eurostat sono conservati come attributi
-descrittivi nullable.
+Risk, dependency, and price measures are non-additive: they are aggregated only
+within homogeneous contexts using `AVG`, `MIN`, or `MAX`. Stock measures are
+level measures and are not summed over time. Eurostat flags are retained as
+nullable descriptive attributes.
 
-Il DDL non crea tabelle di staging separate: i file in `data/raw/` costituiscono
-l'area sorgente del processo e gli script ETL applicano direttamente le
-trasformazioni verso dimensioni e fact table. La colonna priva di semantica
-`compliance_status` è stata esclusa da `FACT_OIL_STOCKS`; il relativo stato
-Eurostat è rappresentato da `eurostat_flag`.
+The DDL does not create separate staging tables: files under `data/raw/` are the
+source area of the process, and the ETL scripts apply transformations directly
+to dimensions and fact tables. The semantically unusable `compliance_status`
+column was excluded from `FACT_OIL_STOCKS`; the relevant Eurostat observation
+status is represented by `eurostat_flag`.
 
-## Esecuzione del data warehouse
+## Running the data warehouse
 
-Il caricamento definitivo è idempotente e non richiede migrazioni intermedie.
-Su un database PostgreSQL vuoto:
+The final loading workflow is idempotent and requires no intermediate
+migrations. On an empty PostgreSQL database:
 
-1. eseguire `sql/schema/create_dw_schema.sql`;
-2. verificare che gli snapshot delle sorgenti siano presenti nella struttura
-   `data/raw/` descritta in `docs/data-sources/README.md`;
-3. eseguire `scripts/run_etl.ps1`, che carica automaticamente dimensioni e
-   fact nell'ordine corretto;
-4. eseguire `sql/schema/verify_final_dw.sql` per i controlli di qualità;
-5. eseguire le query contenute in `sql/queries/`.
+1. run `sql/schema/create_dw_schema.sql`;
+2. verify that the source snapshots are available in the `data/raw/` structure
+   described in `docs/data-sources/README.md`;
+3. run `scripts/run_etl.ps1`, which automatically loads dimensions and facts in
+   the correct order;
+4. run `sql/schema/verify_final_dw.sql` to perform quality checks;
+5. run the queries in `sql/queries/`.
 
-Le connessioni PostgreSQL usano le variabili d'ambiente standard (`PGHOST`,
-`PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` o `PGPASSFILE`). Le password e i
-database locali non fanno parte del repository.
+PostgreSQL connections use the standard environment variables (`PGHOST`,
+`PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, or `PGPASSFILE`). Passwords and
+local databases are not part of the repository.
 
-## Query analitiche
+## Analytical queries
 
 `01_olap_business_queries.sql` contiene:
 
-1. correlazione Pearson tra GPR globale e prezzi elettrici;
-2. media mobile a tre mesi delle scorte;
-3. dipendenza dalle importazioni e prezzi del gas;
-4. confronto annuale delle metriche per i membri UE effettivi.
+1. Pearson correlation between global GPR and electricity prices;
+2. three-month moving average of oil stocks;
+3. import dependency and gas prices;
+4. annual comparison of metrics for actual EU members.
 
 `02_advanced_olap_queries.sql` contiene:
 
-5. shock geopolitico 2022 e variazione dei prezzi del gas;
-6. ranking e percentile della dipendenza energetica nel 2024;
-7. autonomia annuale delle scorte petrolifere nel periodo 2020–2025.
+5. 2022 geopolitical shock and gas-price variation;
+6. 2024 energy-dependency ranking and percentile;
+7. annual oil-stock autonomy from 2020 to 2025.
 
-I risultati esportati sono disponibili in `docs/results/`. Le correlazioni e le
-variazioni temporali descrivono associazioni osservate e non costituiscono
-dimostrazioni di causalità.
+Exported results are available in `docs/results/`. Correlations and temporal
+variations describe observed associations and do not demonstrate causality.
 
-## Grafici
+## Charts
 
-Le figure utilizzate per la presentazione vengono generate dai CSV con:
+The figures used in the presentation are generated from the CSV files with:
 
 ```powershell
 python src/visualization/create_presentation_charts.py
 ```
 
-Lo script salva sei PNG in `docs/results/figures/`. La selezione dei grafici e
-delle righe più significative è descritta in
-`docs/results/presentation_selection.md`. Le dipendenze necessarie sono
-elencate in `requirements.txt`.
+The script saves six PNG files in `docs/results/figures/`. The selection of
+charts and key rows is described in `docs/results/presentation_selection.md`.
+Required dependencies are listed in `requirements.txt`.
 
-## Risultati del caricamento validato
+## Validated loading results
 
-La versione verificata produce 499 righe GPR, 17.316 righe di dipendenza dalle
-importazioni, 314.671 righe di prezzi energetici e 15.103 righe di scorte
-petrolifere. I controlli definiti in `verify_final_dw.sql` verificano conteggi,
-unicità delle chiavi naturali e assenza di orfani dimensionali.
+The validated version produces 499 GPR rows, 17,316 import-dependency rows,
+314,671 energy-price rows, and 15,103 oil-stock rows. The checks defined in
+`verify_final_dw.sql` validate counts, natural-key uniqueness, and the absence
+of orphaned dimension references.
 
-## Fonti
+## Sources
 
-Le fonti ufficiali, gli snapshot utilizzati, i collegamenti ai dataset Eurostat,
-i metadati SDMX, le frequenze e le trasformazioni applicate sono documentati in
+Official sources, the snapshots used, Eurostat dataset links, SDMX metadata,
+frequencies, and applied transformations are documented in
 `docs/data-sources/README.md`.

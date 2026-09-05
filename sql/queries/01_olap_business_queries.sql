@@ -1,17 +1,17 @@
 -- ==============================================================================
--- QUERY OLAP & ANALISI ANALITICA - DATA WAREHOUSE ENERGY SECURITY & GPR
+-- BUSINESS OLAP QUERIES - ENERGY SECURITY & GPR DATA WAREHOUSE
 -- ==============================================================================
 
--- 1. DRILL-ACROSS E CORRELAZIONE TRA GPR GLOBALE E PREZZI ELETTRICI
--- Per ogni paese calcola il coefficiente di Pearson tra il GPR globale medio
--- annuale e il prezzo medio annuo dell'elettricità non-household (fascia IC,
--- EUR/kWh, IVA esclusa). Le due serie vengono aggregate separatamente prima
--- del join per rispettare le rispettive granularità mensile e semestrale. Sono
--- inclusi solo i paesi con almeno 18 anni confrontabili.
+-- 1. DRILL-ACROSS AND CORRELATION BETWEEN GLOBAL GPR AND ELECTRICITY PRICES
+-- For each country, calculates the Pearson coefficient between average annual
+-- global GPR and the average annual non-household electricity price (IC band,
+-- EUR/kWh, excluding VAT). The two series are aggregated separately before the
+-- join to respect their monthly and half-yearly granularities. Only countries
+-- with at least 18 comparable years are included.
 WITH gpr_by_year AS (
     SELECT
-        m.year_val AS anno,
-        AVG(gpr.gpr_val) AS gpr_medio_annuale
+        m.year_val AS year,
+        AVG(gpr.gpr_val) AS average_annual_gpr
     FROM fact_gpr gpr
     JOIN dt_month m ON m.month_sk = gpr.month_sk
     JOIN dim_geo_entity geo ON geo.geo_sk = gpr.geo_sk
@@ -20,9 +20,9 @@ WITH gpr_by_year AS (
 ),
 price_by_country_year AS (
     SELECT
-        s.year_val AS anno,
-        g.country_name AS paese,
-        AVG(p.price_val) AS prezzo_medio_annuale
+        s.year_val AS year,
+        g.country_name AS country,
+        AVG(p.price_val) AS average_annual_price
     FROM fact_energy_price p
     JOIN dt_semester s ON s.semester_sk = p.semester_sk
     JOIN dim_geo_entity g ON g.geo_sk = p.geo_sk
@@ -40,43 +40,42 @@ price_by_country_year AS (
 ),
 paired_series AS (
     SELECT
-        p.anno,
-        p.paese,
-        g.gpr_medio_annuale,
-        p.prezzo_medio_annuale
+        p.year,
+        p.country,
+        g.average_annual_gpr,
+        p.average_annual_price
     FROM price_by_country_year p
-    JOIN gpr_by_year g ON g.anno = p.anno
+    JOIN gpr_by_year g ON g.year = p.year
 )
 SELECT
-    paese,
-    COUNT(*) AS anni_confrontabili,
-    MIN(anno) AS primo_anno,
-    MAX(anno) AS ultimo_anno,
+    country,
+    COUNT(*) AS comparable_years,
+    MIN(year) AS first_year,
+    MAX(year) AS last_year,
     ROUND(CORR(
-        gpr_medio_annuale::DOUBLE PRECISION,
-        prezzo_medio_annuale::DOUBLE PRECISION
-    )::NUMERIC, 3)
-        AS correlazione_pearson_gpr_prezzo
+        average_annual_gpr::DOUBLE PRECISION,
+        average_annual_price::DOUBLE PRECISION
+    )::NUMERIC, 3) AS pearson_correlation_gpr_price
 FROM paired_series
-GROUP BY paese
+GROUP BY country
 HAVING COUNT(*) >= 18
-ORDER BY correlazione_pearson_gpr_prezzo DESC NULLS LAST, paese;
+ORDER BY pearson_correlation_gpr_price DESC NULLS LAST, country;
 
 
--- 2. WINDOW ANALYSIS SULLE SCORTE PETROLIFERE D'EMERGENZA
--- Calcola i giorni equivalenti di scorte con una media mobile a 3 mesi
--- (Window Function), mantenendo il dettaglio mensile e senza mescolare
--- indicatori o unità differenti. Non è un drill-down/roll-up.
-SELECT 
-    m.month_sk AS mese,
-    g.country_name AS paese,
-    ind.indicator_label AS indicatore,
-    s.indicator_value AS giorni_equivalenti,
+-- 2. WINDOW ANALYSIS ON EMERGENCY OIL STOCKS
+-- Calculates equivalent stock days through a three-month moving average,
+-- retaining monthly detail and without mixing different indicators or units.
+-- This is not a drill-down or roll-up operation.
+SELECT
+    m.month_sk AS month,
+    g.country_name AS country,
+    ind.indicator_label AS indicator,
+    s.indicator_value AS equivalent_days,
     ROUND(AVG(s.indicator_value) OVER (
-        PARTITION BY s.geo_sk, s.indicator_sk 
-        ORDER BY m.month_sk 
+        PARTITION BY s.geo_sk, s.indicator_sk
+        ORDER BY m.month_sk
         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
-    ), 2) AS media_mobile_3_mesi_giorni
+    ), 2) AS three_month_moving_average_days
 FROM fact_oil_stocks s
 JOIN dt_month m ON s.month_sk = m.month_sk
 JOIN dim_geo_entity g ON s.geo_sk = g.geo_sk
@@ -88,16 +87,16 @@ WHERE g.eurostat_code IN ('IT', 'DE', 'FR', 'ES')
 ORDER BY g.country_name, m.month_sk DESC;
 
 
--- 3. DRILL-ACROSS E SLICE & DICE: DIPENDENZA ENERGETICA E PREZZI DEL GAS
--- Confronta annualmente il tasso di dipendenza dalle importazioni con i prezzi
--- del gas nelle fasce Eurostat D2 (household) e I3 (non-household), in EUR/kWh
--- con X_VAT. Le due fact vengono aggregate separatamente prima del join.
+-- 3. DRILL-ACROSS AND SLICE & DICE: ENERGY IMPORT DEPENDENCY AND GAS PRICES
+-- Compares annual import-dependency rates with gas prices in Eurostat D2
+-- (household) and I3 (non-household) bands, in EUR/kWh and with X_VAT. The two
+-- fact tables are aggregated separately before the join.
 WITH dependency_by_year AS (
     SELECT
-        y.year_value AS anno,
+        y.year_value AS year,
         g.geo_sk,
-        g.country_name AS paese,
-        AVG(dep.dep_rate_val) AS tasso_dipendenza_import_pct
+        g.country_name AS country,
+        AVG(dep.dep_rate_val) AS import_dependency_rate_pct
     FROM fact_import_dependency dep
     JOIN dt_year y ON y.year_sk = dep.year_sk
     JOIN dim_geo_entity g ON g.geo_sk = dep.geo_sk
@@ -108,12 +107,12 @@ WITH dependency_by_year AS (
 ),
 gas_price_by_year AS (
     SELECT
-        s.year_val AS anno,
+        s.year_val AS year,
         ep.geo_sk,
         AVG(CASE WHEN cb.consumer_type = 'HOUSEHOLD' THEN ep.price_val END)
-            AS prezzo_gas_household,
+            AS household_gas_price,
         AVG(CASE WHEN cb.consumer_type = 'NON_HOUSEHOLD' THEN ep.price_val END)
-            AS prezzo_gas_non_household
+            AS non_household_gas_price
     FROM fact_energy_price ep
     JOIN dt_semester s ON s.semester_sk = ep.semester_sk
     JOIN dt_consumption_band cb
@@ -131,31 +130,31 @@ gas_price_by_year AS (
     GROUP BY s.year_val, ep.geo_sk
 )
 SELECT
-    d.anno,
-    d.paese,
-    ROUND(d.tasso_dipendenza_import_pct, 2) AS tasso_dipendenza_import_pct,
-    ROUND(p.prezzo_gas_household, 4) AS prezzo_gas_household,
-    ROUND(p.prezzo_gas_non_household, 4) AS prezzo_gas_non_household
+    d.year,
+    d.country,
+    ROUND(d.import_dependency_rate_pct, 2) AS import_dependency_rate_pct,
+    ROUND(p.household_gas_price, 4) AS household_gas_price,
+    ROUND(p.non_household_gas_price, 4) AS non_household_gas_price
 FROM dependency_by_year d
 LEFT JOIN gas_price_by_year p
-  ON p.anno = d.anno
+  ON p.year = d.year
  AND p.geo_sk = d.geo_sk
 WHERE p.geo_sk IS NOT NULL
-ORDER BY d.anno DESC, tasso_dipendenza_import_pct DESC, d.paese;
+ORDER BY d.year DESC, import_dependency_rate_pct DESC, d.country;
 
 
--- 4. ANALISI DINAMICA APPARTENENZA UE (TRAMITE TABELLA PONTE BR_GEO_EU_MEMBERSHIP)
--- Aggrega prima le fact a livello paese-anno per evitare duplicazioni tra semestri.
--- Vengono mantenuti solo gli anni in cui entrambe le metriche sono disponibili.
--- Il risultato mostra separatamente i membri UE teorici e i contributori
--- effettivi alle medie, che possono non coincidere.
+-- 4. DYNAMIC EU-MEMBERSHIP ANALYSIS THROUGH BR_GEO_EU_MEMBERSHIP
+-- Facts are first aggregated at country-year level to avoid duplication across
+-- semesters. Only years with both metrics available are retained. The result
+-- separately reports theoretical EU members and actual contributors to each
+-- average, which may differ.
 WITH eu_members AS (
-    SELECT br.year_sk, COUNT(DISTINCT br.geo_sk) AS numero_paesi_membri_ue
+    SELECT br.year_sk, COUNT(DISTINCT br.geo_sk) AS eu_member_count
     FROM br_geo_eu_membership br
     GROUP BY br.year_sk
 ),
 dependency_country_year AS (
-    SELECT d.year_sk, d.geo_sk, AVG(d.dep_rate_val) AS dipendenza_paese_pct
+    SELECT d.year_sk, d.geo_sk, AVG(d.dep_rate_val) AS country_dependency_pct
     FROM fact_import_dependency d
     JOIN dt_energy_product prod ON d.product_sk = prod.product_sk
     JOIN br_geo_eu_membership br ON br.year_sk = d.year_sk AND br.geo_sk = d.geo_sk
@@ -164,13 +163,14 @@ dependency_country_year AS (
 ),
 dependency_eu_year AS (
     SELECT year_sk,
-           COUNT(*) AS numero_paesi_contributori_dipendenza,
-           AVG(dipendenza_paese_pct) AS dipendenza_media_membri_ue_pct
+           COUNT(*) AS dependency_contributor_count,
+           AVG(country_dependency_pct) AS average_eu_import_dependency_pct
     FROM dependency_country_year
     GROUP BY year_sk
 ),
 price_country_year AS (
-    SELECT s.year_val AS year_sk, ep.geo_sk, AVG(ep.price_val) AS prezzo_paese_elettricita
+    SELECT s.year_val AS year_sk, ep.geo_sk,
+           AVG(ep.price_val) AS country_electricity_price
     FROM fact_energy_price ep
     JOIN dt_semester s ON ep.semester_sk = s.semester_sk
     JOIN br_geo_eu_membership br ON br.year_sk = s.year_val AND br.geo_sk = ep.geo_sk
@@ -187,17 +187,17 @@ price_country_year AS (
 ),
 price_eu_year AS (
     SELECT year_sk,
-           COUNT(*) AS numero_paesi_contributori_prezzo,
-           AVG(prezzo_paese_elettricita) AS prezzo_medio_elettricita_ue
+           COUNT(*) AS electricity_price_contributor_count,
+           AVG(country_electricity_price) AS average_eu_electricity_price
     FROM price_country_year
     GROUP BY year_sk
 )
-SELECT y.year_value AS anno,
-       m.numero_paesi_membri_ue,
-       d.numero_paesi_contributori_dipendenza,
-       p.numero_paesi_contributori_prezzo,
-       ROUND(d.dipendenza_media_membri_ue_pct, 2) AS dipendenza_media_membri_ue_pct,
-       ROUND(p.prezzo_medio_elettricita_ue, 4) AS prezzo_medio_elettricita_ue
+SELECT y.year_value AS year,
+       m.eu_member_count,
+       d.dependency_contributor_count,
+       p.electricity_price_contributor_count,
+       ROUND(d.average_eu_import_dependency_pct, 2) AS average_eu_import_dependency_pct,
+       ROUND(p.average_eu_electricity_price, 4) AS average_eu_electricity_price
 FROM eu_members m
 JOIN dt_year y ON m.year_sk = y.year_sk
 LEFT JOIN dependency_eu_year d ON d.year_sk = m.year_sk

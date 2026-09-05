@@ -1,17 +1,17 @@
 -- ==============================================================================
--- QUERY OLAP AVANZATE - DATA WAREHOUSE ENERGY SECURITY & GPR (FASE 2)
+-- ADVANCED OLAP QUERIES - ENERGY SECURITY & GPR DATA WAREHOUSE
 -- ==============================================================================
 
--- 5. DRILL-ACROSS E CONFRONTO TEMPORALE: GPR GLOBALE E PREZZI DEL GAS
--- Confronta i valori del GPR nel periodo 2021-2023 con la variazione percentuale
--- dei prezzi del gas household nella fascia Eurostat D2, espressi in EUR/kWh
--- con tasse e tributi inclusi. Il confronto descrive un'associazione temporale
--- osservata e non dimostra un rapporto causale.
+-- 5. DRILL-ACROSS AND TEMPORAL COMPARISON: GLOBAL GPR AND GAS PRICES
+-- Compares GPR values from 2021 to 2023 with the percentage variation in
+-- household gas prices in Eurostat D2 band, expressed in EUR/kWh with taxes
+-- and levies included. The comparison describes a temporal association and
+-- does not demonstrate a causal relationship.
 WITH price_by_year AS (
-    SELECT 
-        y.year_value AS anno,
-        g.country_name AS paese,
-        AVG(p.price_val) AS prezzo_gas_household
+    SELECT
+        y.year_value AS year,
+        g.country_name AS country,
+        AVG(p.price_val) AS household_gas_price
     FROM fact_energy_price p
     JOIN dt_semester s ON p.semester_sk = s.semester_sk
     JOIN dt_year y ON s.year_val = y.year_sk
@@ -30,16 +30,16 @@ WITH price_by_year AS (
     GROUP BY y.year_value, g.country_name
 ),
 price_with_lag AS (
-    SELECT anno, paese, prezzo_gas_household,
-           LAG(prezzo_gas_household) OVER (
-               PARTITION BY paese ORDER BY anno
-           ) AS prezzo_gas_anno_precedente
+    SELECT year, country, household_gas_price,
+           LAG(household_gas_price) OVER (
+               PARTITION BY country ORDER BY year
+           ) AS previous_year_household_gas_price
     FROM price_by_year
 ),
 gpr_by_year AS (
-    SELECT 
-        m.year_val AS anno,
-        AVG(gpr.gpr_val) AS gpr_medio
+    SELECT
+        m.year_val AS year,
+        AVG(gpr.gpr_val) AS average_gpr
     FROM fact_gpr gpr
     JOIN dt_month m ON gpr.month_sk = m.month_sk
     JOIN dim_geo_entity g ON gpr.geo_sk = g.geo_sk
@@ -47,28 +47,29 @@ gpr_by_year AS (
       AND m.year_val BETWEEN 2021 AND 2023
     GROUP BY m.year_val
 )
-SELECT p.anno, p.paese,
-       ROUND(g.gpr_medio, 2) AS gpr_medio_globale,
-       ROUND(p.prezzo_gas_household, 4) AS prezzo_gas,
+SELECT p.year, p.country,
+       ROUND(g.average_gpr, 2) AS average_global_gpr,
+       ROUND(p.household_gas_price, 4) AS household_gas_price,
        ROUND(CASE
-           WHEN p.prezzo_gas_anno_precedente IS NULL
-             OR p.prezzo_gas_anno_precedente = 0 THEN NULL
-           ELSE ((p.prezzo_gas_household - p.prezzo_gas_anno_precedente)
-                / p.prezzo_gas_anno_precedente) * 100
-       END, 2) AS variazione_prezzo_pct
+           WHEN p.previous_year_household_gas_price IS NULL
+             OR p.previous_year_household_gas_price = 0 THEN NULL
+           ELSE ((p.household_gas_price - p.previous_year_household_gas_price)
+                / p.previous_year_household_gas_price) * 100
+       END, 2) AS gas_price_variation_pct
 FROM price_with_lag p
-JOIN gpr_by_year g ON p.anno = g.anno
-ORDER BY p.paese, p.anno;
+JOIN gpr_by_year g ON p.year = g.year
+ORDER BY p.country, p.year;
 
 
--- 6. WINDOW ANALYSIS: RANKING E PERCENTILE DELLA DIPENDENZA ENERGETICA
--- Classifica i paesi europei in base alla dipendenza dalle importazioni nel 2024.
--- Il percentile crescente assegna il valore più alto ai paesi più dipendenti.
-SELECT 
-    g.country_name AS paese,
-    ROUND(dep.dep_rate_val, 2) AS tasso_dipendenza_2024_pct,
-    DENSE_RANK() OVER (ORDER BY dep.dep_rate_val DESC) AS ranking_dipendenza,
-    ROUND(PERCENT_RANK() OVER (ORDER BY dep.dep_rate_val ASC)::numeric * 100, 2) AS percentile_dipendenza
+-- 6. WINDOW ANALYSIS: 2024 ENERGY-DEPENDENCY RANKING AND PERCENTILE
+-- Ranks European countries by import dependency in 2024. The ascending
+-- percentile assigns the highest value to the most dependent countries.
+SELECT
+    g.country_name AS country,
+    ROUND(dep.dep_rate_val, 2) AS import_dependency_rate_2024_pct,
+    DENSE_RANK() OVER (ORDER BY dep.dep_rate_val DESC) AS dependency_rank,
+    ROUND(PERCENT_RANK() OVER (ORDER BY dep.dep_rate_val ASC)::numeric * 100, 2)
+        AS dependency_percentile
 FROM fact_import_dependency dep
 JOIN dt_year y ON dep.year_sk = y.year_sk
 JOIN dim_geo_entity g ON dep.geo_sk = g.geo_sk
@@ -77,19 +78,19 @@ WHERE y.year_value = 2024
   AND prod.siec_code = 'TOTAL'
   AND g.entity_type = 'Country'
   AND dep.dep_rate_val IS NOT NULL
-ORDER BY ranking_dipendenza;
+ORDER BY dependency_rank;
 
 
--- 7. ROLL-UP ANNUALE DELL'AUTONOMIA DELLE SCORTE PETROLIFERE
--- Analizza esclusivamente le scorte espresse in giorni equivalenti, senza
--- aggregarle con consumi, importazioni, livelli minimi o codici di metodo.
--- Sono considerati gli anni completi 2020-2025; il 2026 è escluso perché parziale.
-SELECT 
-    y.year_value AS anno,
-    g.country_name AS paese,
-    ROUND(AVG(s.indicator_value), 2) AS giorni_equivalenti_medi,
-    ROUND(MIN(s.indicator_value), 2) AS giorni_equivalenti_minimi,
-    ROUND(MAX(s.indicator_value), 2) AS giorni_equivalenti_massimi
+-- 7. ANNUAL ROLL-UP OF OIL-STOCK AUTONOMY
+-- Analyses only stocks expressed in equivalent days, without aggregating them
+-- with consumption, imports, minimum levels, or method codes. Complete years
+-- from 2020 to 2025 are included; 2026 is excluded because it is partial.
+SELECT
+    y.year_value AS year,
+    g.country_name AS country,
+    ROUND(AVG(s.indicator_value), 2) AS average_equivalent_days,
+    ROUND(MIN(s.indicator_value), 2) AS minimum_equivalent_days,
+    ROUND(MAX(s.indicator_value), 2) AS maximum_equivalent_days
 FROM fact_oil_stocks s
 JOIN dt_month m ON s.month_sk = m.month_sk
 JOIN dt_year y ON m.year_val = y.year_sk
@@ -101,4 +102,4 @@ WHERE g.entity_type = 'Country'
   AND ind.indicator_code = 'STK_EUE_DIR'
   AND u.unit_code = 'NR'
 GROUP BY y.year_value, g.country_name
-ORDER BY y.year_value DESC, giorni_equivalenti_medi DESC;
+ORDER BY y.year_value DESC, average_equivalent_days DESC;

@@ -1,5 +1,5 @@
--- Verifiche finali dopo il caricamento completo su database vuoto.
--- Ogni query deve restituire conteggi coerenti e nessun orfano/duplicato.
+-- Final checks after complete loading on an empty database.
+-- Each query must return consistent counts and no orphaned rows or duplicates.
 
 SELECT 'FACT_GPR' AS fact_table, COUNT(*) AS row_count,
        MIN(month_sk) AS first_period, MAX(month_sk) AS last_period

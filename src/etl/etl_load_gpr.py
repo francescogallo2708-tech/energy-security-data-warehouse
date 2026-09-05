@@ -28,7 +28,7 @@ def prepare_gpr_data(df):
     missing_metrics = [column for column in GPR_METRICS if column not in df.columns]
     if missing_metrics:
         raise ValueError(
-            'Colonne GPR obbligatorie mancanti: ' + ', '.join(missing_metrics)
+            'Missing required GPR columns: ' + ', '.join(missing_metrics)
         )
 
     date_col = next(
@@ -47,13 +47,13 @@ def prepare_gpr_data(df):
     if df_scope['month_sk'].isna().any():
         invalid_dates = int(df_scope['month_sk'].isna().sum())
         raise ValueError(
-            f'Trovate {invalid_dates} date non valide in righe con misure GPR valorizzate.'
+            f'Found {invalid_dates} invalid dates in rows with populated GPR measures.'
         )
 
     partial_rows = df_scope[list(GPR_METRICS)].isna().any(axis=1)
     if partial_rows.any():
         raise ValueError(
-            f'Trovate {int(partial_rows.sum())} righe con misure GPR parziali.'
+            f'Found {int(partial_rows.sum())} rows with partial GPR measures.'
         )
 
     outside_scope = df_scope['month_sk'] < GPR_START_MONTH
@@ -61,20 +61,20 @@ def prepare_gpr_data(df):
     df_scope = df_scope.loc[~outside_scope].copy()
 
     if df_scope.empty:
-        raise ValueError('Nessun record GPR disponibile nello scope selezionato.')
+        raise ValueError('No GPR records are available in the selected scope.')
 
     duplicated_months = df_scope['month_sk'].duplicated(keep=False)
     if duplicated_months.any():
         duplicate_values = sorted(df_scope.loc[duplicated_months, 'month_sk'].unique())
         raise ValueError(
-            'Mesi GPR duplicati nel file sorgente: ' + ', '.join(duplicate_values)
+            'Duplicate GPR months in the source file: ' + ', '.join(duplicate_values)
         )
 
     df_scope = df_scope.sort_values('month_sk')
-    print(f'Righe senza GPR/GPRT/GPRA escluse: {excluded_empty_rows}')
-    print(f'Righe valorizzate anteriori a {GPR_START_MONTH} escluse: {excluded_outside_scope}')
+    print(f'Rows without GPR/GPRT/GPRA excluded: {excluded_empty_rows}')
+    print(f'Populated rows before {GPR_START_MONTH} excluded: {excluded_outside_scope}')
     print(
-        'Intervallo GPR selezionato: '
+        'Selected GPR range: '
         f"{df_scope['month_sk'].min()} - {df_scope['month_sk'].max()}"
     )
 
@@ -82,7 +82,7 @@ def prepare_gpr_data(df):
 
 
 def load_gpr_fact():
-    print("--- AVVIO ETL FACT_GPR ---")
+    print("--- STARTING FACT_GPR ETL ---")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
@@ -92,27 +92,27 @@ def load_gpr_fact():
     gpr_file = os.path.expanduser(os.environ.get('GPR_SOURCE_FILE', default_gpr_file))
 
     if not os.path.exists(gpr_file):
-        raise FileNotFoundError(f"Impossibile trovare il file {gpr_file}.")
+        raise FileNotFoundError(f"Could not find file: {gpr_file}.")
 
-    print(f"Trovato file sorgente GPR: {gpr_file}")
+    print(f"Found GPR source file: {gpr_file}")
 
     conn = None
     cursor = None
 
     try:
-        # Lettura del file Excel storico .xls.
+        # Read the historical .xls Excel file.
         df = pd.read_excel(gpr_file, engine='xlrd')
-        print(f"File caricato con successo. Righe grezze: {len(df)}")
+        print(f"File loaded successfully. Raw rows: {len(df)}")
         df_scope = prepare_gpr_data(df)
 
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
-        # La serie GPR selezionata e una serie globale.
+        # The selected GPR series is global.
         cursor.execute("SELECT geo_sk FROM DIM_GEO_ENTITY WHERE eurostat_code = 'GLOBAL';")
         res = cursor.fetchone()
         if not res:
-            raise RuntimeError("Entita 'GLOBAL' non trovata in DIM_GEO_ENTITY.")
+            raise RuntimeError("'GLOBAL' entity not found in DIM_GEO_ENTITY.")
         global_geo_sk = res[0]
 
         month_keys = df_scope['month_sk'].tolist()
@@ -124,7 +124,7 @@ def load_gpr_fact():
         missing_months = sorted(set(month_keys) - available_months)
         if missing_months:
             raise RuntimeError(
-                'Mesi mancanti in DT_MONTH: ' + ', '.join(missing_months[:12])
+                'Missing months in DT_MONTH: ' + ', '.join(missing_months[:12])
             )
 
         tuples_to_insert = [
@@ -138,7 +138,7 @@ def load_gpr_fact():
             for row in df_scope.itertuples(index=False)
         ]
 
-        # Refresh completo e transazionale della sola serie globale.
+        # Fully and transactionally refresh the global series only.
         cursor.execute("DELETE FROM FACT_GPR WHERE geo_sk = %s;", (global_geo_sk,))
 
         insert_query = """
@@ -153,19 +153,19 @@ def load_gpr_fact():
         execute_values(cursor, insert_query, tuples_to_insert)
         conn.commit()
 
-        print(f"[SUCCESSO] Inseriti/Aggiornati {len(tuples_to_insert)} record nella tabella FACT_GPR.")
+        print(f"[SUCCESS] Inserted/updated {len(tuples_to_insert)} records in FACT_GPR.")
 
     except Exception as e:
         if conn is not None:
             conn.rollback()
-        print(f"[ERRORE] Durante l'ETL del GPR: {e}")
+        print(f"[ERROR] FACT_GPR ETL failed: {e}")
         raise
     finally:
         if cursor is not None:
             cursor.close()
         if conn is not None:
             conn.close()
-        print("--- FINE ETL FACT_GPR ---")
+        print("--- FACT_GPR ETL COMPLETED ---")
 
 
 if __name__ == "__main__":

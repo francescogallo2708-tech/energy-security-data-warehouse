@@ -3,7 +3,7 @@ import getpass
 import psycopg2
 from psycopg2.extras import execute_values
 
-# Configurazione connessione PostgreSQL
+# PostgreSQL connection configuration
 DB_CONFIG = {
     'dbname': os.environ.get('PGDATABASE', 'energy_gpr_dw'),
     'user': os.environ.get('PGUSER', 'postgres'),
@@ -15,42 +15,42 @@ if os.environ.get('PGPASSWORD'):
 elif not os.environ.get('PGPASSFILE'):
     DB_CONFIG['password'] = getpass.getpass('Password PostgreSQL: ')
 
-# Mappatura storica ingresso (ed eventuale uscita) paesi UE: (eurostat_code, entry_year, exit_year)
-# NOTA: exit_year è None se il paese è tuttora membro dell'Unione Europea.
+# Historical EU entry and, where applicable, exit mapping:
+# (eurostat_code, entry_year, exit_year). exit_year is None for current members.
 EU_MEMBERSHIP_HISTORY = [
-    # Paesi fondatori (1957/1958)
+    # Founding countries (1957/1958)
     ("BE", 1957, None), ("DE", 1957, None), ("FR", 1957, None),
     ("IT", 1957, None), ("LU", 1957, None), ("NL", 1957, None),
-    # Allargamento 1973
-    ("DK", 1973, None), ("IE", 1973, None), ("UK", 1973, 2020), # Brexit nel 2020
-    # Allargamento 1981
+    # 1973 enlargement
+    ("DK", 1973, None), ("IE", 1973, None), ("UK", 1973, 2020),  # Brexit in 2020
+    # 1981 enlargement
     ("EL", 1981, None),
-    # Allargamento 1986
+    # 1986 enlargement
     ("ES", 1986, None), ("PT", 1986, None),
-    # Allargamento 1995
+    # 1995 enlargement
     ("AT", 1995, None), ("FI", 1995, None), ("SE", 1995, None),
-    # Allargamento 2004 (10 nuovi paesi)
+    # 2004 enlargement (10 new countries)
     ("CY", 2004, None), ("CZ", 2004, None), ("EE", 2004, None),
     ("HU", 2004, None), ("LT", 2004, None), ("LV", 2004, None),
     ("MT", 2004, None), ("PL", 2004, None), ("SI", 2004, None), ("SK", 2004, None),
-    # Allargamento 2007
+    # 2007 enlargement
     ("BG", 2007, None), ("RO", 2007, None),
-    # Allargamento 2013
+    # 2013 enlargement
     ("HR", 2013, None)
 ]
 
 def load_bridge_eu_membership():
-    print("--- AVVIO POPOLAMENTO TABELLA PONTE BR_GEO_EU_MEMBERSHIP ---")
+    print("--- STARTING BR_GEO_EU_MEMBERSHIP BRIDGE LOADING ---")
     
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # 1. Recupera il mapping (eurostat_code -> geo_sk)
+        # 1. Retrieve the mapping (eurostat_code -> geo_sk).
         cursor.execute("SELECT eurostat_code, geo_sk FROM DIM_GEO_ENTITY;")
         geo_map = dict(cursor.fetchall())
         
-        # 2. Recupera tutti gli anni disponibili in DT_YEAR
+        # 2. Retrieve all years available in DT_YEAR.
         cursor.execute("SELECT year_sk, year_value FROM DT_YEAR;")
         years = cursor.fetchall()
         
@@ -60,7 +60,8 @@ def load_bridge_eu_membership():
             if code in geo_map:
                 geo_sk = geo_map[code]
                 for year_sk, year_val in years:
-                    # Il paese fa parte dell'UE nell'anno se: year >= entry_year AND (exit_year IS NULL OR year < exit_year)
+                    # A country is an EU member if year >= entry_year and
+                    # (exit_year is None or year < exit_year).
                     if year_val >= entry_year and (exit_year is None or year_val < exit_year):
                         tuples_to_insert.append((geo_sk, year_sk))
         
@@ -73,15 +74,15 @@ def load_bridge_eu_membership():
         execute_values(cursor, insert_query, tuples_to_insert)
         conn.commit()
         
-        print(f"[SUCCESSO] Inserite {len(tuples_to_insert)} relazioni di appartenenza UE nella tabella ponte.")
+        print(f"[SUCCESS] Inserted {len(tuples_to_insert)} EU-membership relationships into the bridge table.")
         
     except Exception as e:
-        print(f"[ERRORE] Durante il popolamento della tabella ponte UE: {e}")
+        print(f"[ERROR] EU-membership bridge loading failed: {e}")
         raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()
-        print("--- FINE POPOLAMENTO TABELLA PONTE UE ---")
+        print("--- BR_GEO_EU_MEMBERSHIP BRIDGE LOADING COMPLETED ---")
 
 if __name__ == "__main__":
     load_bridge_eu_membership()

@@ -2,51 +2,51 @@ import os
 from pathlib import Path
 import pandas as pd
 
-# Percorso del file GPR, risolto rispetto alla radice del repository.
+# GPR file path, resolved relative to the repository root.
 project_dir = Path(__file__).resolve().parents[2]
 gpr_file_path = project_dir / "data" / "raw" / "gpr" / "data_gpr_export_202608.xls"
 
-print("=== AVVIO PROFILING DATASET GEOPOLITICAL RISK (GPR) ===\n")
+print("=== STARTING GEOPOLITICAL RISK (GPR) DATASET PROFILING ===\n")
 
 if not os.path.exists(gpr_file_path):
-  print(f"[ATTENZIONE] File GPR non trovato nel percorso: {gpr_file_path}")
+  print(f"[WARNING] GPR file not found at: {gpr_file_path}")
 else:
-  print(f"Lettura del file: {os.path.basename(gpr_file_path)}")
+  print(f"Reading file: {os.path.basename(gpr_file_path)}")
 
-  # Lettura del file Excel
+  # Read the Excel file.
   df_gpr = pd.read_excel(gpr_file_path)
 
-  # Dimensioni del dataset
+  # Dataset dimensions.
   rows, cols = df_gpr.shape
-  print(f"  - Dimensioni totali: {rows} righe, {cols} colonne")
+  print(f"  - Total dimensions: {rows} rows, {cols} columns")
 
-  # Verifica della presenza della colonna temporale principale ('month')
+  # Verify the presence of the primary time column ('month').
   if "month" in df_gpr.columns:
     min_date = df_gpr["month"].min()
     max_date = df_gpr["month"].max()
-    print(f"  - Copertura temporale ('month'): da {min_date} a {max_date}")
+    print(f"  - Time coverage ('month'): from {min_date} to {max_date}")
   else:
     print(
-        "  - [AVVISO] Colonna 'month' non trovata con esattezza nell'intestazione"
-        " principale."
+        "  - [WARNING] Column 'month' was not found exactly in the main"
+        " header."
     )
 
-  # Statistiche sui valori nulli
+  # Statistics on null values.
   total_cells = rows * cols
   null_cells = df_gpr.isnull().sum().sum()
-  print(f"  - Celle totali: {total_cells}")
+  print(f"  - Total cells: {total_cells}")
   print(
-      f"  - Celle con valori nulli (NaN): {null_cells}"
+      f"  - Cells with null values (NaN): {null_cells}"
       f" ({(null_cells/total_cells)*100:.2f}%)"
   )
 
-  # Anteprima delle principali colonne di indice globale se presenti
+  # Preview the main global-index columns when present.
   key_indicators = [col for col in ["GPR", "GPRT", "GPRA"] if col in df_gpr.columns]
   if key_indicators:
     print(
-        "  - Indicatori globali principali rilevati nel dataset:"
+        "  - Main global indicators found in the dataset:"
         f" {key_indicators}"
     )
 
   print("-" * 50)
-  print("\nProfiling GPR completato.")
+  print("\nGPR profiling completed.")

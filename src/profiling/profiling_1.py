@@ -2,11 +2,11 @@ import os
 from pathlib import Path
 import pandas as pd
 
-# Percorso della cartella contenente i file raw di Eurostat.
+# Path to the directory containing raw Eurostat files.
 project_dir = Path(__file__).resolve().parents[2]
 eurostat_dir = project_dir / "data" / "raw" / "eurostat"
 
-# Lista dei file TSV Eurostat da profilare
+# List of Eurostat TSV files to profile.
 eurostat_files = [
     "nrg_ind_id_tabular.tsv",
     "nrg_pc_202_tabular.tsv",
@@ -16,41 +16,41 @@ eurostat_files = [
     "nrg_stk_oem_tabular.tsv",
 ]
 
-print("=== AVVIO PROFILING DATASET EUROSTAT ===\n")
+print("=== STARTING EUROSTAT DATASET PROFILING ===\n")
 
 for filename in eurostat_files:
   file_path = eurostat_dir / filename
 
   if not os.path.exists(file_path):
-    print(f"[ATTENZIONE] File non trovato: {filename}")
+    print(f"[WARNING] File not found: {filename}")
     continue
 
-  print(f"Analisi del file: {filename}")
+  print(f"Analysing file: {filename}")
 
-  # Lettura del file TSV usando il motore python per gestire correttamente i separatori complessi
+  # Read the TSV file with the Python engine to handle complex separators.
   df = pd.read_csv(file_path, sep="\t", engine="python")
 
-  # Informazioni generali sulle dimensioni
+  # General size information.
   num_rows, num_cols = df.shape
-  print(f"  - Dimensioni: {num_rows} righe, {num_cols} colonne")
+  print(f"  - Dimensions: {num_rows} rows, {num_cols} columns")
 
-  # La prima colonna contiene i metadati concatenati (es. freq,siec,unit,geo)
+  # The first column contains concatenated metadata (e.g., freq,siec,unit,geo).
   first_col_name = df.columns[0]
-  print(f"  - Colonna metadati compositi: '{first_col_name}'")
+  print(f"  - Composite metadata column: '{first_col_name}'")
 
-  # Estrazione di un'anteprima delle componenti splittate per verificare la struttura
+  # Extract a preview of split components to verify the structure.
   split_sample = df[first_col_name].astype(str).str.split(",", expand=True)
   print(
-      f"  - Numero di dimensioni individuate nella prima colonna:"
+      f"  - Number of dimensions identified in the first column:"
       f" {split_sample.shape[1]}"
   )
 
-  # Controllo preliminare di valori mancanti o stringhe vuote nelle celle
+  # Preliminary check for missing values or empty strings in cells.
   missing_count = (df == ": ").sum().sum()
   print(
-      f"  - Indicatori di valore mancante (es. ': '): circa {missing_count}"
-      " celle"
+      f"  - Missing-value markers (e.g., ': '): approximately {missing_count}"
+      " cells"
   )
   print("-" * 50)
 
-print("\nProfiling Eurostat completato.")
+print("\nEurostat profiling completed.")

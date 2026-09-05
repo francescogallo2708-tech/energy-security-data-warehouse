@@ -70,7 +70,7 @@ def read_codelists(metadata_file):
     missing = REQUIRED_CODELISTS - set(codelists)
     if missing:
         raise ValueError(
-            f'Codelist mancanti in {metadata_file}: {", ".join(sorted(missing))}'
+            f'Missing codelists in {metadata_file}: {", ".join(sorted(missing))}'
         )
 
     return codelists
@@ -81,7 +81,7 @@ def map_required_labels(series, labels, dimension_name, source_name):
     missing_codes = sorted(source_codes - set(labels))
     if missing_codes:
         raise ValueError(
-            f'Codici {dimension_name} senza etichetta in {source_name}: '
+            f'{dimension_name} codes without labels in {source_name}: '
             + ', '.join(missing_codes)
         )
     return series.map(labels)
@@ -97,13 +97,13 @@ def prepare_import_dependency(tsv_file, metadata_file):
     missing_meta = REQUIRED_META_COLUMNS - set(meta_cols)
     if missing_meta:
         raise ValueError(
-            f'Colonne metadata mancanti in {source_name}: '
+            f'Missing metadata columns in {source_name}: '
             + ', '.join(sorted(missing_meta))
         )
 
     df_split = df_raw[first_col].str.split(',', expand=True)
     if df_split.shape[1] != len(meta_cols):
-        raise ValueError(f'Struttura metadata inattesa in {source_name}.')
+        raise ValueError(f'Unexpected metadata structure in {source_name}.')
     df_split.columns = meta_cols
 
     df_data = pd.concat([df_split, df_raw.drop(columns=[first_col])], axis=1)
@@ -116,7 +116,7 @@ def prepare_import_dependency(tsv_file, metadata_file):
         if re.fullmatch(r'\d{4}', column)
     ]
     if not year_cols:
-        raise ValueError(f'Nessun anno riconosciuto in {source_name}.')
+        raise ValueError(f'No recognized year found in {source_name}.')
 
     df_long = pd.melt(
         df_data,
@@ -136,19 +136,19 @@ def prepare_import_dependency(tsv_file, metadata_file):
     dependency = df_long.dropna(subset=['dep_rate_val']).copy()
 
     if dependency.empty:
-        raise ValueError(f'Nessun valore numerico trovato in {source_name}.')
+        raise ValueError(f'No numeric value found in {source_name}.')
 
     unexpected_frequency = sorted(set(dependency['freq']) - {'A'})
     if unexpected_frequency:
         raise ValueError(
-            f'Frequenze inattese in {source_name}: '
+            f'Unexpected frequencies in {source_name}: '
             + ', '.join(unexpected_frequency)
         )
 
     unexpected_units = sorted(set(dependency['unit']) - {'PC'})
     if unexpected_units:
         raise ValueError(
-            f'Unita inattese in {source_name}: ' + ', '.join(unexpected_units)
+            f'Unexpected units in {source_name}: ' + ', '.join(unexpected_units)
         )
 
     dependency['geo_code'] = dependency['geo']
@@ -168,21 +168,21 @@ def prepare_import_dependency(tsv_file, metadata_file):
     duplicate_rows = dependency.duplicated(natural_key, keep=False)
     if duplicate_rows.any():
         raise ValueError(
-            f'Trovate {int(duplicate_rows.sum())} osservazioni duplicate '
-            'alla granularita della fact.'
+            f'Found {int(duplicate_rows.sum())} duplicate observations '
+            'at the fact-table grain.'
         )
 
-    print(f'Righe sorgente: {len(df_raw)} serie')
-    print(f'Osservazioni quantitative: {len(dependency)}')
+    print(f'Source rows: {len(df_raw)} series')
+    print(f'Quantitative observations: {len(dependency)}')
     print(
-        f"Copertura temporale: {dependency['year_sk'].min()}-"
+        f"Time coverage: {dependency['year_sk'].min()}-"
         f"{dependency['year_sk'].max()}"
     )
     return dependency
 
 
 def load_import_dependency_fact():
-    print('--- AVVIO ETL FACT_IMPORT_DEPENDENCY ---')
+    print('--- STARTING FACT_IMPORT_DEPENDENCY ETL ---')
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
@@ -204,11 +204,11 @@ def load_import_dependency_fact():
 
     try:
         if not os.path.exists(tsv_file):
-            raise FileNotFoundError(f'File TSV non trovato: {tsv_file}')
+            raise FileNotFoundError(f'TSV file not found: {tsv_file}')
         if not os.path.exists(metadata_file):
-            raise FileNotFoundError(f'File metadata XML non trovato: {metadata_file}')
+            raise FileNotFoundError(f'XML metadata file not found: {metadata_file}')
 
-        print(f'Trovato file sorgente: {tsv_file}')
+        print(f'Found source file: {tsv_file}')
         dependency = prepare_import_dependency(tsv_file, metadata_file)
 
         conn = psycopg2.connect(**DB_CONFIG)
@@ -222,14 +222,14 @@ def load_import_dependency_fact():
         missing_geos = sorted(set(dependency['geo_code']) - set(geo_map))
         if missing_geos:
             raise RuntimeError(
-                'Codici geografici mancanti in DIM_GEO_ENTITY: '
+                'Missing geographic codes in DIM_GEO_ENTITY: '
                 + ', '.join(missing_geos)
             )
 
         missing_years = sorted(set(dependency['year_sk']) - valid_years)
         if missing_years:
             raise RuntimeError(
-                'Anni mancanti in DT_YEAR: '
+                'Missing years in DT_YEAR: '
                 + ', '.join(str(year) for year in missing_years)
             )
 
@@ -279,7 +279,7 @@ def load_import_dependency_fact():
             for row in dependency.itertuples(index=False)
         ]
 
-        # Refresh completo: la fact deriva interamente dal TSV Eurostat.
+        # Full refresh: the fact table is entirely derived from the Eurostat TSV.
         cursor.execute('DELETE FROM FACT_IMPORT_DEPENDENCY;')
         execute_values(
             cursor,
@@ -293,23 +293,23 @@ def load_import_dependency_fact():
         )
         conn.commit()
 
-        print(f'Dimensione prodotti energetici: {len(product_rows)} record')
+        print(f'Energy-product dimension: {len(product_rows)} records')
         print(
-            f'[SUCCESSO] Inseriti {len(fact_rows)} record complessivi '
+            f'[SUCCESS] Inserted {len(fact_rows)} total records '
             'in FACT_IMPORT_DEPENDENCY.'
         )
 
     except Exception as exc:
         if conn is not None:
             conn.rollback()
-        print(f'[ERRORE] Durante ETL Import Dependency: {exc}')
+        print(f'[ERROR] FACT_IMPORT_DEPENDENCY ETL failed: {exc}')
         raise
     finally:
         if cursor is not None:
             cursor.close()
         if conn is not None:
             conn.close()
-        print('--- FINE ETL FACT_IMPORT_DEPENDENCY ---')
+        print('--- FACT_IMPORT_DEPENDENCY ETL COMPLETED ---')
 
 
 if __name__ == '__main__':

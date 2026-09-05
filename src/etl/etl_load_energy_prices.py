@@ -104,7 +104,7 @@ def read_codelists(metadata_file):
     missing = REQUIRED_CODELISTS - set(codelists)
     if missing:
         raise ValueError(
-            f'Codelist mancanti in {metadata_file}: {", ".join(sorted(missing))}'
+            f'Missing codelists in {metadata_file}: {", ".join(sorted(missing))}'
         )
 
     return codelists
@@ -115,7 +115,7 @@ def map_required_labels(series, labels, dimension_name, source_name):
     missing_codes = sorted(source_codes - set(labels))
     if missing_codes:
         raise ValueError(
-            f'Codici {dimension_name} senza etichetta in {source_name}: '
+            f'{dimension_name} codes without labels in {source_name}: '
             + ', '.join(missing_codes)
         )
     return series.map(labels)
@@ -131,12 +131,12 @@ def prepare_price_file(filepath, metadata_file, config):
     missing_meta = REQUIRED_META_COLUMNS - set(meta_cols)
     if missing_meta:
         raise ValueError(
-            f'Colonne metadata mancanti in {filepath}: {", ".join(sorted(missing_meta))}'
+            f'Missing metadata columns in {filepath}: {", ".join(sorted(missing_meta))}'
         )
 
     df_split = df_raw[first_col].str.split(',', expand=True)
     if df_split.shape[1] != len(meta_cols):
-        raise ValueError(f'Struttura metadata inattesa in {filepath}.')
+        raise ValueError(f'Unexpected metadata structure in {filepath}.')
     df_split.columns = meta_cols
 
     df_data = pd.concat([df_split, df_raw.drop(columns=[first_col])], axis=1)
@@ -149,7 +149,7 @@ def prepare_price_file(filepath, metadata_file, config):
         if re.fullmatch(r'\d{4}-S[12]', column)
     ]
     if not semester_cols:
-        raise ValueError(f'Nessun semestre riconosciuto in {filepath}.')
+        raise ValueError(f'No recognized semester found in {filepath}.')
 
     df_long = pd.melt(
         df_data,
@@ -166,18 +166,18 @@ def prepare_price_file(filepath, metadata_file, config):
     df_valid = df_long.dropna(subset=['price_val']).copy()
 
     if df_valid.empty:
-        raise ValueError(f'Nessun prezzo numerico trovato in {filepath}.')
+        raise ValueError(f'No numeric price found in {filepath}.')
 
     unexpected_frequency = sorted(set(df_valid['freq']) - {'S'})
     if unexpected_frequency:
         raise ValueError(
-            f'Frequenze inattese in {filepath}: {", ".join(unexpected_frequency)}'
+            f'Unexpected frequencies in {filepath}: {", ".join(unexpected_frequency)}'
         )
 
     source_siec = sorted(df_valid['siec'].unique())
     if source_siec != [config['siec']]:
         raise ValueError(
-            f'Codici SIEC inattesi in {filepath}: {", ".join(source_siec)}'
+            f'Unexpected SIEC codes in {filepath}: {", ".join(source_siec)}'
         )
 
     band_order = {
@@ -208,7 +208,7 @@ def prepare_price_file(filepath, metadata_file, config):
             df_valid.loc[df_valid['tax_inclusion_order'].isna(), 'tax_code'].unique()
         )
         raise ValueError(
-            f'Ordine fiscale non definito in {filepath}: {", ".join(unknown_taxes)}'
+            f'Undefined tax order in {filepath}: {", ".join(unknown_taxes)}'
         )
 
     df_valid['energy_unit_code'] = df_valid['unit']
@@ -225,13 +225,13 @@ def prepare_price_file(filepath, metadata_file, config):
 
     print(
         f"  - {config['commodity']} / {config['consumer']}: "
-        f'{len(df_valid)} osservazioni quantitative'
+        f'{len(df_valid)} quantitative observations'
     )
     return df_valid
 
 
 def load_energy_prices():
-    print('--- AVVIO ETL FACT_ENERGY_PRICE ---')
+    print('--- STARTING FACT_ENERGY_PRICE ETL ---')
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
@@ -253,11 +253,11 @@ def load_energy_prices():
             filepath = os.path.join(eurostat_dir, config['file'])
             metadata_file = os.path.join(metadata_dir, config['metadata'])
             if not os.path.exists(filepath):
-                raise FileNotFoundError(f'File TSV non trovato: {filepath}')
+                raise FileNotFoundError(f'TSV file not found: {filepath}')
             if not os.path.exists(metadata_file):
-                raise FileNotFoundError(f'File metadata XML non trovato: {metadata_file}')
+                raise FileNotFoundError(f'XML metadata file not found: {metadata_file}')
 
-            print(f"Elaborazione: {config['file']}")
+            print(f"Processing: {config['file']}")
             prepared_frames.append(
                 prepare_price_file(
                     filepath=os.path.abspath(filepath),
@@ -280,8 +280,8 @@ def load_energy_prices():
         duplicate_rows = prices.duplicated(natural_key, keep=False)
         if duplicate_rows.any():
             raise ValueError(
-                f'Trovate {int(duplicate_rows.sum())} osservazioni duplicate '
-                'alla granularita della fact.'
+                f'Found {int(duplicate_rows.sum())} duplicate observations '
+                'at the fact-table grain.'
             )
 
         conn = psycopg2.connect(**DB_CONFIG)
@@ -295,14 +295,14 @@ def load_energy_prices():
         missing_geos = sorted(set(prices['geo_code']) - set(geo_map))
         if missing_geos:
             raise RuntimeError(
-                'Codici geografici mancanti in DIM_GEO_ENTITY: '
+                'Missing geographic codes in DIM_GEO_ENTITY: '
                 + ', '.join(missing_geos)
             )
 
         missing_semesters = sorted(set(prices['semester_sk']) - valid_semesters)
         if missing_semesters:
             raise RuntimeError(
-                'Semestri mancanti in DT_SEMESTER: ' + ', '.join(missing_semesters)
+                'Missing semesters in DT_SEMESTER: ' + ', '.join(missing_semesters)
             )
 
         band_columns = [
@@ -449,7 +449,7 @@ def load_energy_prices():
             for row in prices.itertuples(index=False)
         ]
 
-        # Refresh completo: l'intera fact deriva dai quattro file sorgente.
+        # Full refresh: the complete fact table derives from the four source files.
         cursor.execute('DELETE FROM FACT_ENERGY_PRICE;')
         execute_values(
             cursor,
@@ -464,25 +464,25 @@ def load_energy_prices():
         )
         conn.commit()
 
-        print(f'Dimensione fasce di consumo: {len(band_rows)} record')
-        print(f'Dimensione livelli fiscali: {len(tax_rows)} record')
-        print(f'Dimensione unita-prezzo: {len(price_unit_rows)} record')
+        print(f'Consumption-band dimension: {len(band_rows)} records')
+        print(f'Tax-level dimension: {len(tax_rows)} records')
+        print(f'Price-unit dimension: {len(price_unit_rows)} records')
         print(
-            f'[SUCCESSO] Inseriti {len(fact_rows)} record complessivi '
+            f'[SUCCESS] Inserted {len(fact_rows)} total records '
             'in FACT_ENERGY_PRICE.'
         )
 
     except Exception as exc:
         if conn is not None:
             conn.rollback()
-        print(f'[ERRORE] Durante ETL Energy Prices: {exc}')
+        print(f'[ERROR] FACT_ENERGY_PRICE ETL failed: {exc}')
         raise
     finally:
         if cursor is not None:
             cursor.close()
         if conn is not None:
             conn.close()
-        print('--- FINE ETL FACT_ENERGY_PRICE ---')
+        print('--- FACT_ENERGY_PRICE ETL COMPLETED ---')
 
 
 if __name__ == '__main__':

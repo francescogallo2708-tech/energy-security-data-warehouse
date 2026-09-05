@@ -1,83 +1,84 @@
-# Selezione dei risultati per la presentazione
+# Result selection for the presentation
 
-Questa selezione riduce i CSV completi a pochi risultati leggibili nelle slide.
-I CSV originali restano integri nella stessa cartella.
+This selection reduces the complete CSV files to a small number of results
+that can be read easily on slides. The original CSV files remain unchanged in
+the same directory.
 
-## Figure consigliate
+## Recommended figures
 
-1. `figures/02_eu_dependency_electricity_trend.png` — andamento UE 2007–2024;
-2. `figures/03_shock_2022_gas_price_change.png` — variazione osservata del prezzo del gas nel 2022;
-3. `figures/04_ranking_import_dependency_2024.png` — confronto tra Paesi;
-4. `figures/05_oil_stock_autonomy_2025.png` — autonomia delle scorte nel 2025;
-5. `figures/01_correlation_gpr_electricity.png` — risultato sintetico della correlazione.
+1. `figures/02_eu_dependency_electricity_trend.png` — EU trend, 2007–2024;
+2. `figures/03_shock_2022_gas_price_change.png` — observed gas-price variation in 2022;
+3. `figures/04_ranking_import_dependency_2024.png` — comparison across countries;
+4. `figures/05_oil_stock_autonomy_2025.png` — oil-stock autonomy in 2025;
+5. `figures/01_correlation_gpr_electricity.png` — summary correlation result.
 
-La figura `06_import_dependency_gas_price_2024.png` è un'alternativa utile se
-si vuole approfondire il confronto household/non-household del gas.
+`06_import_dependency_gas_price_2024.png` is a useful alternative figure for a
+more detailed comparison of household and non-household gas prices.
 
-## Righe da citare nelle slide
+## Rows to cite in the slides
 
-### Query 1 — correlazione
+### Query 1 — correlation
 
-- Italy: `r = 0,863`, 18 anni confrontabili;
-- Ireland: `r = 0,846`;
-- Malta: `r = -0,338`.
+- Italy: `r = 0.863`, 18 comparable years;
+- Ireland: `r = 0.846`;
+- Malta: `r = -0.338`.
 
-Interpretazione: associazione lineare osservata, non causalità.
+Interpretation: observed linear association, not causality.
 
-### Query 2 — scorte e media mobile (maggio 2026)
+### Query 2 — oil stocks and moving average (May 2026)
 
-| Paese | Giorni equivalenti | Media mobile 3 mesi |
+| Country | Equivalent days | Three-month moving average |
 |-|-:|-:|
-| Spain | 106,378 | 102,25 |
-| Germany | 92,675 | 93,95 |
-| France | 91,343 | 92,23 |
-| Italy | 76,592 | 81,17 |
+| Spain | 106.378 | 102.25 |
+| Germany | 92.675 | 93.95 |
+| France | 91.343 | 92.23 |
+| Italy | 76.592 | 81.17 |
 
-### Query 3 — Italia (2024)
+### Query 3 — Italy (2024)
 
-| Dipendenza import | Gas household | Gas non-household |
+| Import dependency | Household gas | Non-household gas |
 |-:|-:|-:|
-| 73,88% | 0,1173 EUR/kWh | 0,0560 EUR/kWh |
+| 73.88% | 0.1173 EUR/kWh | 0.0560 EUR/kWh |
 
-### Query 4 — UE
+### Query 4 — EU
 
-| Anno | Membri UE | Contributori prezzo | Dipendenza media | Prezzo elettricità |
+| Year | EU members | Price contributors | Average dependency | Electricity price |
 |-:|-:|-:|-:|-:|
-| 2007 | 27 | 26 | 56,79% | 0,0898 EUR/kWh |
-| 2020 | 27 | 27 | 57,99% | 0,1077 EUR/kWh |
-| 2024 | 27 | 27 | 56,04% | 0,1755 EUR/kWh |
+| 2007 | 27 | 26 | 56.79% | 0.0898 EUR/kWh |
+| 2020 | 27 | 27 | 57.99% | 0.1077 EUR/kWh |
+| 2024 | 27 | 27 | 56.04% | 0.1755 EUR/kWh |
 
-Nel 2019 il conteggio è 28; dal 2020 è 27, coerentemente con la Brexit.
-Nel 2007 un Paese membro non ha un'osservazione di prezzo comparabile.
+In 2019 the count is 28; from 2020 it is 27, consistently with Brexit.
+In 2007, one member country has no comparable price observation.
 
-### Query 5 — shock 2022
+### Query 5 — 2022 shock
 
-- Lithuania: `+172,13%`;
-- Belgium: `+101,57%`;
-- Italy: `+34,43%`.
+- Lithuania: `+172.13%`;
+- Belgium: `+101.57%`;
+- Italy: `+34.43%`.
 
-Il GPR globale passa da `82,07` (2021) a `157,58` (2022) e scende a `121,71`
-nel 2023.
+Global GPR rises from `82.07` (2021) to `157.58` (2022) and decreases to
+`121.71` in 2023.
 
-### Query 6 — ranking 2024
+### Query 6 — 2024 ranking
 
-- Malta: `98,39%`, primo posto;
-- Italy: `73,88%`, nono posto;
-- Estonia: `4,62%`;
-- Norway: `-677,20%`, outlier dovuto alla definizione dell'indicatore Eurostat.
+- Malta: `98.39%`, first place;
+- Italy: `73.88%`, ninth place;
+- Estonia: `4.62%`;
+- Norway: `-677.20%`, an outlier caused by the Eurostat indicator definition.
 
-### Query 7 — scorte 2025
+### Query 7 — 2025 oil stocks
 
-- Finland: `150,78` giorni medi;
-- Greece: `112,04`;
-- Italy: `90,74` giorni medi (min `90,18`, max `91,24`);
-- Albania, Georgia, Moldova, Montenegro, North Macedonia, Norway e Türkiye:
-  valori medi pari a zero, da presentare esplicitando che sono valori pubblicati
-  dalla fonte;
-- Serbia: `44,42` giorni medi.
+- Finland: `150.78` average days;
+- Greece: `112.04`;
+- Italy: `90.74` average days (min `90.18`, max `91.24`);
+- Albania, Georgia, Moldova, Montenegro, North Macedonia, Norway, and Türkiye:
+  average values equal to zero, which should be presented explicitly as values
+  published by the source;
+- Serbia: `44.42` average days.
 
-## Set minimo raccomandato
+## Recommended minimum set
 
-Per una presentazione breve usare le figure 02, 03, 04 e 05, più la tabella
-Italia della query 3. La figura 01 può essere aggiunta nella sezione conclusiva
-come sintesi quantitativa della relazione GPR-prezzo.
+For a short presentation, use Figures 02, 03, 04, and 05, together with the
+Italy table from Query 3. Figure 01 can be added in the conclusion as a
+quantitative summary of the GPR-price relationship.
