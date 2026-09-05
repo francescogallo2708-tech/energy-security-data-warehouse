@@ -106,6 +106,7 @@ def load_geography_dimension():
         
     except Exception as e:
         print(f"[ERRORE] Connessione o inserimento fallito: {e}")
+        raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()

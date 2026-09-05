@@ -77,6 +77,7 @@ def load_bridge_eu_membership():
         
     except Exception as e:
         print(f"[ERRORE] Durante il popolamento della tabella ponte UE: {e}")
+        raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()

@@ -1,114 +1,79 @@
-# Report di Profiling Preliminare dei Dataset
+# Report finale di profiling e validazione
+
 **Progetto:** Data Warehouse per l'analisi della sicurezza energetica europea e del rischio geopolitico  
-**Data:** 30 agosto 2026
-**Stato:** Completata la validazione strutturale e la riconciliazione delle fact table caricate; corretta la grana unità-valuta dei prezzi, resta da completare il mapping geografico.
+**Data di riferimento:** 5 settembre 2026  
+**Ambiente:** PostgreSQL locale di test, dopo l'esecuzione completa del workflow ETL finale.
 
----
+## 1. Obiettivo e perimetro
 
-## 1. Introduzione e Obiettivi
-Questo documento raccoglie le evidenze emerse durante la fase di data profiling dei dataset grezzi acquisiti (`data/raw/`). L'obiettivo è validare la struttura formale, identificare le criticità di formattazione (es. separatori complessi, formati wide/long) e definire le regole di trasformazione necessarie per la successiva fase ETL verso dimensioni e fact table del Data Warehouse.
+Il profiling ha guidato la progettazione delle dimensioni, delle fact table e delle regole ETL. La validazione finale verifica che i file sorgente siano stati trasformati alla grana prevista, che le chiavi naturali non producano duplicati e che ogni riga caricata abbia riferimenti dimensionali validi.
 
----
+Il workflow utilizza file raw Eurostat TSV e il file GPR XLS. I file wide vengono convertiti in long quando necessario; codici, flag Eurostat e mapping geografico sono risolti durante l'ETL.
 
-## 2. Sintesi dei Dataset Analizzati
+## 2. Sorgenti utilizzate
 
-| Fonte / Dominio | Nome File | Formato | Dimensioni Rilevate | Copertura Temporale | Note Strutturali / Criticità |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Import Dependency** | `nrg_ind_id_tabular.tsv` | TSV (Eurostat) | 533 righe, 36 colonne | 1990 - 2024 | Formato *wide*: prima colonna mista (`freq,siec,unit,geo`), anni disposti sulle colonne successive con separatore a tabulazione (`\t`). |
-| **Gas Prices (Household)** | `nrg_pc_202_tabular.tsv` | TSV (Eurostat) | 2.268 righe, 39 colonne | 2007-S1 - 2025-S2 | Formato *wide* semestrale. Prima colonna mista (`freq,siec,nrg_cons,unit,tax,currency,geo`). |
-| **Gas Prices (Non-House.)** | `nrg_pc_203_tabular.tsv` | TSV (Eurostat) | 4.104 righe, 39 colonne | 2007-S1 - 2025-S2 | Formato *wide* semestrale con medesima struttura della famiglia prezzi. |
-| **Electricity Prices (House.)**| `nrg_pc_204_tabular.tsv` | TSV (Eurostat) | 2.196 righe, 39 colonne | 2007-S1 - 2025-S2 | Formato *wide* semestrale. |
-| **Electricity Prices (Non-House.)**| `nrg_pc_205_tabular.tsv` | TSV (Eurostat) | 2.895 righe, 39 colonne | 2007-S1 - 2025-S2 | Formato *wide* semestrale. |
-| **Emergency Oil Stocks** | `nrg_stk_oem_tabular.tsv` | TSV (Eurostat) | 223 righe, 163 colonne | 2013-01 - 2026-06 | Formato *wide* mensile. Prima colonna: `freq,stk_flow,unit,geo`. |
-| **Geopolitical Risk (GPR)** | `data_gpr_export_202608.xls` | Excel (Tabulare) | 1.519 righe, 115 colonne | 1900-01 - 2026-07 | Formato tabulare classico. Colonne ben distinte (es. `month`, `GPR`, `GPRT`, ecc.). Presenza di valori nulli storici nativi. |
+| Dominio | File | Formato | Frequenza | Copertura utilizzata |
+|---|---|---|---|---|
+| Import dependency | `nrg_ind_id_tabular.tsv` | TSV wide | annuale | 1990–2024 |
+| Gas prices | `nrg_pc_202_tabular.tsv`, `nrg_pc_203_tabular.tsv` | TSV wide | semestrale | 2007-S1–2025-S2 |
+| Electricity prices | `nrg_pc_204_tabular.tsv`, `nrg_pc_205_tabular.tsv` | TSV wide | semestrale | 2007-S1–2025-S2 |
+| Emergency oil stocks | `nrg_stk_oem_tabular.tsv` | TSV wide | mensile | 2013-01–2026-06 |
+| Geopolitical Risk | `data_gpr_export_202608.xls` | XLS tabulare | mensile | 1985-01–2026-07 nello scope caricato |
 
----
+## 3. Risultati finali del caricamento
 
-## 3. Risultanze Principali e Specificità Tecniche
+| Fact table | Grana logica | Righe caricate | Periodo caricato |
+|---|---|---:|---|
+| `FACT_GPR` | mese, entità geografica, serie GPR | 499 | 1985-01–2026-07 |
+| `FACT_IMPORT_DEPENDENCY` | anno, entità geografica, prodotto energetico | 17.316 | 1990–2024 |
+| `FACT_ENERGY_PRICE` | semestre, entità geografica, fascia, livello fiscale, unità-prezzo | 314.671 | 2007-S1–2025-S2 |
+| `FACT_OIL_STOCKS` | mese, entità geografica, indicatore, unità di misura | 15.103 | 2013-01–2026-06 |
 
-### A. Famiglia Dataset Eurostat (`.tsv`)
-* **Struttura delle Chiavi Naturali:** Le dimensioni non si trovano su colonne separate, bensì concatenate in un'unica stringa iniziale divisa da virgole (es. `A,G3000,PC_IMP,IT`). L'ETL richiederà una fase di string splitting mirata (`.str.split(',')`).
-* **Orientamento Temporale (*Wide to Long*):** I periodi temporali (anni, semestri o mesi) costituiscono le intestazioni delle colonne a destra della prima. È obbligatorio applicare un'operazione di `melt` (pivot inverso) per convertire la struttura da orizzontale a verticale, rendendola compatibile con le Fact Table del Data Warehouse.
-* **Valori Mancanti e Flag:** I valori nulli o non disponibili non sono lasciati a celle vuote standard, ma codificati tramite stringhe testuali (es. `": "`) o accompagnati da flag statistici ufficiali Eurostat che andranno intercettati e salvati negli attributi descrittivi dedicati.
+Le dimensioni temporali sono popolate per anni, semestri e mesi. La dimensione geografica contiene 46 entità e la tabella ponte UE contiene 1.191 relazioni storiche.
 
-### B. Dataset Geopolitical Risk (`.xls`)
-* **Pulizia e Normalizzazione:** Il file Excel è strutturato correttamente in formato tabulare. La coordinata temporale principale è rappresentata dalla colonna `month`.
-* **Nulli Storici:** Il profiling ha rilevato oltre 55.000 celle a valore nullo complessivo, concentratie principalmente nelle serie storiche più remote (inizi del '900) o in indicatori specifici/nazionali non calcolati per tutti i periodi. Tale comportamento è del tutto fisiologico e gestibile a livello di caricamento.
+## 4. Regole di trasformazione
 
----
+### Import dependency
 
-## 4. Indicazioni per le Fasi Successive (ETL e Staging)
-1. **Preparazione ETL:** trasformare i file raw wide in record long, validare codici e flag e caricare direttamente dimensioni e fact table.
-2. **Normalizzazione Geografica:** Prima di popolare le Fact Table, sarà indispensabile completare la tabella di mapping comune per risolvere disallineamenti di codifica (es. codici a 2 caratteri Eurostat vs codici ISO o GPR).
-3. **Popolamento Dimensioni:** Procedere rigorosamente al caricamento preventivo delle dimensioni temporali (`DT_MONTH`, `DT_SEMESTER`, `DT_YEAR`), geografiche (`DT_GEO_ENTITY`) e di dominio (`DT_PRICE_UNIT`, `DT_RISK_SERIES`) prima di alimentare le tabelle dei fatti.
+Il file wide è stato convertito in osservazioni annuali. Le dimensioni `DT_YEAR`, `DIM_GEO_ENTITY` e `DT_ENERGY_PRODUCT` vengono risolte tramite le chiavi naturali della fonte. Il caricamento finale comprende 17.316 osservazioni quantitative.
 
----
+### Energy price
 
-## 5. Riconciliazione delle fact table del 30 agosto 2026
+I quattro file dei prezzi sono stati convertiti da wide a long. La grana comprende valuta e unità energetica attraverso `DT_PRICE_UNIT`, evitando di accorpare osservazioni con valuta diversa. Sono state popolate 25 fasce di consumo, 3 livelli fiscali e 6 combinazioni unità-valuta.
 
-La riconciliazione è stata eseguita confrontando a livello di chiave e valore le sorgenti trasformate con le righe presenti in PostgreSQL (`energy_gpr_dw`, istanza locale di lavoro sulla porta 5433). Sono stati inoltre controllati duplicati, null, copertura temporale, integrità referenziale, geografie escluse e flag Eurostat.
+### Emergency oil stocks
 
-### 5.1 Sintesi del confronto database-ETL
+Sono state mantenute le osservazioni quantitative coerenti con la fact table. 13.144 record categoriali relativi ai metodi di calcolo sono stati esclusi; 15.103 record sono stati caricati alla grana mensile prevista. `eurostat_flag` è conservato come attributo descrittivo. La colonna priva di semantica `compliance_status` è stata rimossa dal modello fisico e dall'ETL.
 
-| Fact table | Righe attese dalla logica ETL | Righe DB | Chiavi mancanti | Chiavi extra | Valori differenti | Orfani dimensionali |
-| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `FACT_GPR` | 1.519 | 1.519 | 0 | 0 | 0 | 0 |
-| `FACT_IMPORT_DEPENDENCY` | 16.016 | 16.016 | 0 | 0 | 0 | 0 |
-| `FACT_ENERGY_PRICE` | 290.620 | 290.620 | 0 | 0 | 0 | 0 |
+### Geopolitical Risk
 
-Le tre tabelle corrispondono esattamente alla logica implementata negli ETL. Questa corrispondenza tecnica, tuttavia, non implica una copertura completa delle sorgenti: i controlli successivi evidenziano scarti geografici e dimensionali.
+Il file GPR contiene 1.519 righe sorgente. Sono state escluse 1.020 righe prive di valori per `GPR`, `GPRT` e `GPRA`; il caricamento finale riguarda 499 osservazioni della serie globale nello scope 1985-01–2026-07. Le serie nazionali e alternative presenti nel file non fanno parte della prima versione del DW.
 
-### 5.2 Geopolitical Risk
+## 5. Controlli di qualità
 
-* Grana verificata: una riga per `month_sk` e riga geografica `GLOBAL`.
-* Copertura continua: `1900-01`--`2026-07`.
-* Duplicati sulla chiave: 0.
-* Le misure `gpr_val`, `gprt_val` e `gpra_val` coincidono con la fonte dopo l'arrotondamento previsto dal tipo `NUMERIC(10,4)`.
-* I null coincidono con la fonte: 1.020 per ciascuna delle tre misure, relativi alla parte storica in cui gli indici recenti non sono disponibili.
+Sono stati eseguiti controlli su conteggi e periodi, duplicati sulle chiavi naturali, orfani dimensionali, chiavi temporali/geografiche e idempotenza degli ETL.
 
-**Limite di copertura:** il file contiene 115 colonne, ma l'implementazione corrente carica soltanto `month`, `GPR`, `GPRT` e `GPRA`. Le serie storiche alternative e nazionali (`GPRH`, `GPRC_*`, `GPRHC_*`, ecc.) non sono ancora rappresentate nella fact table. Occorre decidere esplicitamente se la prima versione del DW resta limitata ai tre indici globali oppure se implementare `DT_RISK_SERIES` e il caricamento *wide-to-long* delle altre serie.
+| Controllo | Risultato |
+|---|---:|
+| Duplicati `FACT_GPR` | 0 |
+| Duplicati `FACT_IMPORT_DEPENDENCY` | 0 |
+| Duplicati `FACT_ENERGY_PRICE` | 0 |
+| Duplicati `FACT_OIL_STOCKS` | 0 |
+| Orfani `FACT_IMPORT_DEPENDENCY` | 0 |
+| Orfani `FACT_ENERGY_PRICE` | 0 |
+| Orfani `FACT_OIL_STOCKS` | 0 |
 
-### 5.3 Import Dependency
+I controlli confermano che le fact table rispettano la grana dichiarata e che ogni chiave esterna valorizzata trova la relativa dimensione. La grana di ogni fact table è inoltre applicata fisicamente mediante una chiave primaria composta dalle rispettive chiavi esterne.
 
-* Osservazioni numeriche nella fonte: 17.316.
-* Osservazioni caricate e perfettamente riconciliate: 16.016.
-* Copertura caricata: 1990--2024, 37 entità geografiche.
-* Duplicati sulla chiave naturale: 0.
-* Valori differenti tra sorgente trasformata e database: 0.
-* Osservazioni caricate accompagnate da flag Eurostat: 0.
+## 6. Copertura e limiti
 
-Sono escluse 1.300 osservazioni numeriche perché i relativi codici non sono ancora presenti in `DIM_GEO_ENTITY`:
+- Il GPR è limitato alle tre misure globali `GPR`, `GPRT` e `GPRA`.
+- La copertura geografica dipende dal mapping comune e dalle entità pubblicate dalle fonti.
+- Prezzi, tassi percentuali, indicatori GPR e giorni equivalenti non sono additivi: le analisi usano `AVG`, `MIN` e `MAX` alla grana appropriata.
+- `BR_GEO_EU_MEMBERSHIP` è una tabella ponte per la membership UE storica, non una fact table con misure.
+- Le tabelle di staging non sono presenti nel DDL finale: i file raw costituiscono l'area sorgente e gli ETL caricano direttamente le dimensioni e le fact table.
+- `compliance_status` è stato rimosso dal DDL e dall'ETL perché non era mai valorizzato e non aveva una semantica utilizzabile.
 
-| Codice | Righe escluse |
-| :--- | ---: |
-| `BA` | 143 |
-| `IS` | 455 |
-| `UA` | 403 |
-| `XK` | 299 |
+## 7. Conclusione
 
-Queste righe non devono essere considerate errori di parsing: richiedono l'estensione e la validazione del mapping geografico comune.
-
-### 5.4 Energy Prices
-
-| Dataset | Valori numerici | Esclusi per geografia | Chiavi naturali complete mappate | Righe caricate | Righe mappate con flag |
-| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gas Household (`nrg_pc_202`) | 60.526 | 4.740 | 55.786 | 55.786 | 936 |
-| Gas Non-Household (`nrg_pc_203`) | 109.038 | 7.578 | 101.460 | 101.460 | 1.854 |
-| Electricity Household (`nrg_pc_204`) | 65.466 | 6.105 | 59.361 | 59.361 | 1.380 |
-| Electricity Non-Household (`nrg_pc_205`) | 79.641 | 5.628 | 74.013 | 74.013 | 1.278 |
-| **Totale** | **314.671** | **24.051** | **290.620** | **290.620** | **5.448** |
-
-Le 290.620 osservazioni mappate sono univoche usando la chiave naturale completa della fonte, che comprende `currency`. L'anomalia iniziale è stata corretta introducendo `DT_PRICE_UNIT`, con chiave univoca sulla coppia `energy_unit_code`/`currency_code`, e usando `price_unit_sk` nella grana della fact table.
-
-La nuova fact contiene 99.601 righe `EUR`, 95.949 `NAC` e 95.070 `PPS`. Sono presenti sei combinazioni unità-valuta: `GJ_GCV` e `KWH`, ciascuna associata a `EUR`, `NAC` e `PPS`. Tutti i 5.448 flag Eurostat della parte mappata sono stati conservati senza differenze rispetto alla fonte.
-
-Sono inoltre escluse 24.051 osservazioni associate ai codici geografici `BA`, `EA`, `IS`, `LI`, `UA` e `XK`. `EA` è un aggregato temporale generico e non deve essere automaticamente assimilato a `EA20` senza una regola esplicita.
-
-**Esito:** `FACT_ENERGY_PRICE` è ora completamente riconciliata per tutte le geografie già mappate: 0 chiavi mancanti, 0 chiavi extra, 0 differenze di valore, 0 differenze nei flag e 0 orfani dimensionali. Restano da estendere il mapping per i paesi mancanti e da definire esplicitamente il trattamento dell'aggregato `EA`. `price_comparability_flag` resta `NULL` finché non sarà definita una regola derivata verificabile.
-
-### 5.5 Valutazione conclusiva
-
-* `FACT_GPR`: riconciliata per le tre misure globali implementate; resta aperta la decisione sulle serie nazionali e storiche.
-* `FACT_IMPORT_DEPENDENCY`: valori caricati riconciliati; caricamento ancora incompleto per quattro codici geografici.
-* `FACT_ENERGY_PRICE`: grana unità-valuta corretta e 290.620 righe riconciliate; restano soltanto gli scarti geografici da risolvere.
-* `FACT_OIL_STOCKS`: già riconciliata separatamente con 28.247 righe, nessun duplicato e nessun orfano dimensionale.
+Il profiling e la validazione finale confermano la coerenza tra sorgenti, trasformazioni ETL, schema a costellazione e query OLAP. Il presente documento riporta esclusivamente lo stato finale utilizzato per la consegna.

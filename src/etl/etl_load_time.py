@@ -61,6 +61,7 @@ def load_time_dimensions():
 
     except Exception as e:
         print(f"[ERRORE] Popolamento temporale fallito: {e}")
+        raise
     finally:
         if 'cursor' in locals(): cursor.close()
         if 'conn' in locals(): conn.close()

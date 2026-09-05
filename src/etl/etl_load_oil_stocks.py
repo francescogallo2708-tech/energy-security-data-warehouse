@@ -69,8 +69,7 @@ def load_oil_stocks_fact():
     )
 
     if not os.path.exists(tsv_file):
-        print(f"[ERRORE] File {tsv_file} non trovato.")
-        return
+        raise FileNotFoundError(f"File {tsv_file} non trovato.")
 
     print(f"Trovato file sorgente: {tsv_file}")
 
@@ -164,7 +163,6 @@ def load_oil_stocks_fact():
         df_filtered['geo_sk'] = df_filtered['geo'].map(geo_map)
         df_filtered['indicator_sk'] = df_filtered['stk_flow'].map(indicator_map)
         df_filtered['measure_unit_sk'] = df_filtered['unit'].map(unit_map)
-        df_filtered['compliance_status'] = None
 
         key_cols = ['month_sk', 'geo_sk', 'indicator_sk', 'measure_unit_sk']
         df_dedup = df_filtered.drop_duplicates(subset=key_cols, keep='last')
@@ -175,7 +173,6 @@ def load_oil_stocks_fact():
                 int(row['geo_sk']),
                 int(row['indicator_sk']),
                 int(row['measure_unit_sk']),
-                row['compliance_status'],
                 row['eurostat_flag'],
                 float(row['indicator_value'])
             )
@@ -188,10 +185,9 @@ def load_oil_stocks_fact():
             cursor,
             """
             INSERT INTO FACT_OIL_STOCKS
-            (month_sk, geo_sk, indicator_sk, measure_unit_sk, compliance_status, eurostat_flag, indicator_value)
+            (month_sk, geo_sk, indicator_sk, measure_unit_sk, eurostat_flag, indicator_value)
             VALUES %s
             ON CONFLICT (month_sk, geo_sk, indicator_sk, measure_unit_sk) DO UPDATE SET
-                compliance_status = EXCLUDED.compliance_status,
                 eurostat_flag = EXCLUDED.eurostat_flag,
                 indicator_value = EXCLUDED.indicator_value;
             """,
@@ -203,6 +199,7 @@ def load_oil_stocks_fact():
 
     except Exception as e:
         print(f"[ERRORE] Durante l'ETL Oil Stocks: {e}")
+        raise
     finally:
         if 'cursor' in locals():
             cursor.close()
