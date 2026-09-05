@@ -29,6 +29,9 @@ env/
 *.sqlite3
 *.db
 
+# Private project notes
+DIARIO_PROGETTO.md
+
 # Raw data: keep source links/metadata in the repository, not large local files
 data/raw/*
 !data/raw/.gitkeep

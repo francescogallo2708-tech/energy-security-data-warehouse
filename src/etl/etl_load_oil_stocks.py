@@ -85,6 +85,8 @@ def load_oil_stocks_fact():
         df_data.columns = [str(c).strip() for c in df_data.columns]
 
         month_cols = [c for c in df_data.columns if re.match(r'^\d{4}-\d{2}$', c)]
+        if not month_cols:
+            raise ValueError('Nessuna colonna mensile YYYY-MM trovata nel file Oil Stocks.')
 
         df_long = pd.melt(
             df_data,
@@ -152,20 +154,49 @@ def load_oil_stocks_fact():
         cursor.execute("SELECT month_sk FROM DT_MONTH;")
         valid_months = set(r[0] for r in cursor.fetchall())
 
-        df_filtered = df_valid[
-            df_valid['geo'].isin(geo_map)
-            & df_valid['stk_flow'].isin(STOCK_INDICATORS)
-            & df_valid['unit'].isin(unit_map)
-            & df_valid['unit'].eq(df_valid['stk_flow'].map(EXPECTED_UNITS))
-            & df_valid['month_sk'].isin(valid_months)
+        quantitative_rows = df_valid[
+            ~df_valid['stk_flow'].isin(EXCLUDED_METHOD_INDICATORS)
         ].copy()
+        supported_rows = (
+            quantitative_rows['geo'].isin(geo_map)
+            & quantitative_rows['stk_flow'].isin(STOCK_INDICATORS)
+            & quantitative_rows['unit'].isin(unit_map)
+            & quantitative_rows['unit'].eq(quantitative_rows['stk_flow'].map(EXPECTED_UNITS))
+            & quantitative_rows['month_sk'].isin(valid_months)
+        )
+        unexpected_rows = quantitative_rows.loc[~supported_rows]
+        print(f'Record quantitativi inattesi: {len(unexpected_rows)}')
+        if not unexpected_rows.empty:
+            sample = (
+                unexpected_rows[['stk_flow', 'unit', 'geo', 'month_sk']]
+                .drop_duplicates()
+                .head(10)
+                .to_dict('records')
+            )
+            raise ValueError(
+                'Il file Oil Stocks contiene record quantitativi non riconosciuti. '
+                f'Esempio: {sample}'
+            )
+
+        df_filtered = quantitative_rows.loc[supported_rows].copy()
 
         df_filtered['geo_sk'] = df_filtered['geo'].map(geo_map)
         df_filtered['indicator_sk'] = df_filtered['stk_flow'].map(indicator_map)
         df_filtered['measure_unit_sk'] = df_filtered['unit'].map(unit_map)
 
         key_cols = ['month_sk', 'geo_sk', 'indicator_sk', 'measure_unit_sk']
-        df_dedup = df_filtered.drop_duplicates(subset=key_cols, keep='last')
+        duplicate_rows = df_filtered[df_filtered.duplicated(subset=key_cols, keep=False)]
+        if not duplicate_rows.empty:
+            duplicate_sample = (
+                duplicate_rows[key_cols]
+                .drop_duplicates()
+                .head(10)
+                .to_dict('records')
+            )
+            raise ValueError(
+                'Il file Oil Stocks contiene duplicati alla grana della fact. '
+                f'Esempio: {duplicate_sample}'
+            )
 
         tuples_to_insert = [
             (
@@ -176,10 +207,17 @@ def load_oil_stocks_fact():
                 row['eurostat_flag'],
                 float(row['indicator_value'])
             )
-            for _, row in df_dedup.iterrows()
+            for _, row in df_filtered.iterrows()
         ]
 
         print(f"Record pronti per l'inserimento: {len(tuples_to_insert)}")
+        if not tuples_to_insert:
+            raise ValueError('Nessun record quantitativo valido da caricare in FACT_OIL_STOCKS.')
+
+        # Full refresh: evita di mantenere righe obsolete quando la sorgente
+        # viene aggiornata. Il DELETE e l'INSERT appartengono alla stessa
+        # transazione e vengono annullati insieme in caso di errore.
+        cursor.execute("DELETE FROM FACT_OIL_STOCKS;")
 
         execute_values(
             cursor,
@@ -187,9 +225,7 @@ def load_oil_stocks_fact():
             INSERT INTO FACT_OIL_STOCKS
             (month_sk, geo_sk, indicator_sk, measure_unit_sk, eurostat_flag, indicator_value)
             VALUES %s
-            ON CONFLICT (month_sk, geo_sk, indicator_sk, measure_unit_sk) DO UPDATE SET
-                eurostat_flag = EXCLUDED.eurostat_flag,
-                indicator_value = EXCLUDED.indicator_value;
+            ;
             """,
             tuples_to_insert
         )
@@ -198,6 +234,8 @@ def load_oil_stocks_fact():
         print(f"[SUCCESSO] Inseriti/Aggiornati {len(tuples_to_insert)} record nella tabella FACT_OIL_STOCKS.")
 
     except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
         print(f"[ERRORE] Durante l'ETL Oil Stocks: {e}")
         raise
     finally:

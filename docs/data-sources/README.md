@@ -16,9 +16,13 @@ stored here are small, versioned metadata artifacts.
 | `nrg_pc_205` | [Data Browser](https://ec.europa.eu/eurostat/databrowser/view/nrg_pc_205/default/table?lang=en) | Electricity prices, non-household | Half-yearly, 2007-S1–2025-S2 | `data/raw/eurostat/nrg_pc_205_tabular.tsv` |
 | `nrg_stk_oem` | [Data Browser](https://ec.europa.eu/eurostat/databrowser/view/nrg_stk_oem/default/table?lang=en) | Emergency oil-security indicators | Monthly, 2013-01–2026-06 | `data/raw/eurostat/nrg_stk_oem_tabular.tsv` |
 
-The corresponding metadata files are `ESTAT_NRG_*.xml`. They define the
+The corresponding metadata files are `ESTAT_NRG_*.xml`. They document the
 dimensions and codelists (`GEO`, `SIEC`, `NRG_CONS`, `TAX`, `UNIT`, `CURRENCY`,
-`STK_FLOW`, `OBS_FLAG` and `CONF_STATUS`) used by the ETL validation logic.
+`STK_FLOW`, `OBS_FLAG` and `CONF_STATUS`). At runtime, the import-dependency
+and energy-price ETLs read their XML files to validate the source structure and
+codes. The Oil Stocks XML is retained as versioned source documentation; its
+ETL uses the explicit quantitative scope defined in the Python mappings because
+the final fact excludes the categorical method indicators.
 
 ### Eurostat transformations
 
@@ -47,7 +51,9 @@ Reference: [Geopolitical Risk Index](https://www.matteoiacoviello.com/gpr.htm).
 
 ## Reproducibility and provenance
 
-Before loading, run the profiling scripts in `src/profiling/` and review
-`src/profiling/report_profiling.md`. Then execute the definitive DDL and ETL
-workflow. Raw files remain immutable; all cleaning, filtering and mapping
-rules are implemented in the ETL scripts rather than by editing source files.
+The final profiling report is available in `src/profiling/report_profiling.md`.
+The profiling scripts are optional inspection tools; the reproducible loading
+workflow starts with the definitive DDL and then executes the ETL scripts in
+the documented order. Raw files remain immutable; all cleaning, filtering and
+mapping rules are implemented in the ETL scripts rather than by editing source
+files.

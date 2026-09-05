@@ -6,7 +6,7 @@ I CSV originali restano integri nella stessa cartella.
 ## Figure consigliate
 
 1. `figures/02_eu_dependency_electricity_trend.png` — andamento UE 2007–2024;
-2. `figures/03_shock_2022_gas_price_change.png` — effetto osservato dello shock 2022;
+2. `figures/03_shock_2022_gas_price_change.png` — variazione osservata del prezzo del gas nel 2022;
 3. `figures/04_ranking_import_dependency_2024.png` — confronto tra Paesi;
 4. `figures/05_oil_stock_autonomy_2025.png` — autonomia delle scorte nel 2025;
 5. `figures/01_correlation_gpr_electricity.png` — risultato sintetico della correlazione.
@@ -71,8 +71,10 @@ nel 2023.
 - Finland: `150,78` giorni medi;
 - Greece: `112,04`;
 - Italy: `90,74` giorni medi (min `90,18`, max `91,24`);
-- Albania e Serbia: valori medi pari a zero, da presentare solo spiegando che
-  sono valori pubblicati dalla fonte.
+- Albania, Georgia, Moldova, Montenegro, North Macedonia, Norway e Türkiye:
+  valori medi pari a zero, da presentare esplicitando che sono valori pubblicati
+  dalla fonte;
+- Serbia: `44,42` giorni medi.
 
 ## Set minimo raccomandato
 

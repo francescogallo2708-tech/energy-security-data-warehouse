@@ -2,10 +2,11 @@
 -- QUERY OLAP AVANZATE - DATA WAREHOUSE ENERGY SECURITY & GPR (FASE 2)
 -- ==============================================================================
 
--- 5. ANALISI DELLO SHOCK GEOPOLITICO 2022 (GUERRA IN UCRAINA)
--- Confronta i valori del GPR prima (2021), durante (2022) e dopo lo shock (2023) 
--- con la variazione percentuale dei prezzi del Gas Household nella fascia Eurostat D2,
--- espressi in EUR/kWh con tasse e tributi inclusi.
+-- 5. DRILL-ACROSS E CONFRONTO TEMPORALE: GPR GLOBALE E PREZZI DEL GAS
+-- Confronta i valori del GPR nel periodo 2021-2023 con la variazione percentuale
+-- dei prezzi del gas household nella fascia Eurostat D2, espressi in EUR/kWh
+-- con tasse e tributi inclusi. Il confronto descrive un'associazione temporale
+-- osservata e non dimostra un rapporto causale.
 WITH price_by_year AS (
     SELECT 
         y.year_value AS anno,
@@ -60,7 +61,7 @@ JOIN gpr_by_year g ON p.anno = g.anno
 ORDER BY p.paese, p.anno;
 
 
--- 6. RANKING PAESI PER DIPENDENZA ENERGETICA E PERCENTILE (PERCENT_RANK & DENSE_RANK)
+-- 6. WINDOW ANALYSIS: RANKING E PERCENTILE DELLA DIPENDENZA ENERGETICA
 -- Classifica i paesi europei in base alla dipendenza dalle importazioni nel 2024.
 -- Il percentile crescente assegna il valore più alto ai paesi più dipendenti.
 SELECT 
@@ -79,7 +80,7 @@ WHERE y.year_value = 2024
 ORDER BY ranking_dipendenza;
 
 
--- 7. AUTONOMIA DELLE SCORTE PETROLIFERE D'EMERGENZA PER PAESE
+-- 7. ROLL-UP ANNUALE DELL'AUTONOMIA DELLE SCORTE PETROLIFERE
 -- Analizza esclusivamente le scorte espresse in giorni equivalenti, senza
 -- aggregarle con consumi, importazioni, livelli minimi o codici di metodo.
 -- Sono considerati gli anni completi 2020-2025; il 2026 è escluso perché parziale.

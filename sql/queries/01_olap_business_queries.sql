@@ -2,7 +2,7 @@
 -- QUERY OLAP & ANALISI ANALITICA - DATA WAREHOUSE ENERGY SECURITY & GPR
 -- ==============================================================================
 
--- 1. CORRELAZIONE TRA RISCHIO GEOPOLITICO GLOBALE E PREZZI DELL'ELETTRICITÀ
+-- 1. DRILL-ACROSS E CORRELAZIONE TRA GPR GLOBALE E PREZZI ELETTRICI
 -- Per ogni paese calcola il coefficiente di Pearson tra il GPR globale medio
 -- annuale e il prezzo medio annuo dell'elettricità non-household (fascia IC,
 -- EUR/kWh, IVA esclusa). Le due serie vengono aggregate separatamente prima
@@ -63,9 +63,10 @@ HAVING COUNT(*) >= 18
 ORDER BY correlazione_pearson_gpr_prezzo DESC NULLS LAST, paese;
 
 
--- 2. DRILL-DOWN / ROLL-UP SULLE SCORTE PETROLIFERE D'EMERGENZA
--- Calcola i giorni equivalenti di scorte di emergenza con la media mobile
--- (Window Function) a 3 mesi, senza mescolare indicatori o unita differenti.
+-- 2. WINDOW ANALYSIS SULLE SCORTE PETROLIFERE D'EMERGENZA
+-- Calcola i giorni equivalenti di scorte con una media mobile a 3 mesi
+-- (Window Function), mantenendo il dettaglio mensile e senza mescolare
+-- indicatori o unità differenti. Non è un drill-down/roll-up.
 SELECT 
     m.month_sk AS mese,
     g.country_name AS paese,
@@ -87,7 +88,7 @@ WHERE g.eurostat_code IN ('IT', 'DE', 'FR', 'ES')
 ORDER BY g.country_name, m.month_sk DESC;
 
 
--- 3. SLICE & DICE: DIPENDENZA ENERGETICA E PREZZI DEL GAS
+-- 3. DRILL-ACROSS E SLICE & DICE: DIPENDENZA ENERGETICA E PREZZI DEL GAS
 -- Confronta annualmente il tasso di dipendenza dalle importazioni con i prezzi
 -- del gas nelle fasce Eurostat D2 (household) e I3 (non-household), in EUR/kWh
 -- con X_VAT. Le due fact vengono aggregate separatamente prima del join.
@@ -145,8 +146,9 @@ ORDER BY d.anno DESC, tasso_dipendenza_import_pct DESC, d.paese;
 
 -- 4. ANALISI DINAMICA APPARTENENZA UE (TRAMITE TABELLA PONTE BR_GEO_EU_MEMBERSHIP)
 -- Aggrega prima le fact a livello paese-anno per evitare duplicazioni tra semestri.
--- Vengono mantenuti solo gli anni in cui entrambe le metriche sono disponibili,
--- così il confronto UE è completo e direttamente interpretabile.
+-- Vengono mantenuti solo gli anni in cui entrambe le metriche sono disponibili.
+-- Il risultato mostra separatamente i membri UE teorici e i contributori
+-- effettivi alle medie, che possono non coincidere.
 WITH eu_members AS (
     SELECT br.year_sk, COUNT(DISTINCT br.geo_sk) AS numero_paesi_membri_ue
     FROM br_geo_eu_membership br

@@ -24,7 +24,7 @@ Il workflow utilizza file raw Eurostat TSV e il file GPR XLS. I file wide vengon
 
 | Fact table | Grana logica | Righe caricate | Periodo caricato |
 |---|---|---:|---|
-| `FACT_GPR` | mese, entità geografica, serie GPR | 499 | 1985-01–2026-07 |
+| `FACT_GPR` | mese, entità geografica | 499 | 1985-01–2026-07 |
 | `FACT_IMPORT_DEPENDENCY` | anno, entità geografica, prodotto energetico | 17.316 | 1990–2024 |
 | `FACT_ENERGY_PRICE` | semestre, entità geografica, fascia, livello fiscale, unità-prezzo | 314.671 | 2007-S1–2025-S2 |
 | `FACT_OIL_STOCKS` | mese, entità geografica, indicatore, unità di misura | 15.103 | 2013-01–2026-06 |

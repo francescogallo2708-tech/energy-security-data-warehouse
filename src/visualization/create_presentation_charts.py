@@ -98,11 +98,11 @@ def shock_chart() -> None:
     ax.barh(show["paese"], show["variazione_prezzo_pct"], color=colors)
     ax.axvline(0, color="#333333", linewidth=0.8)
     ax.set_xlabel("Variazione del prezzo del gas household rispetto al 2021 (%)")
-    ax.set_title("Shock del 2022: variazione del prezzo del gas")
+    ax.set_title("Variazione osservata del prezzo del gas nel 2022")
     ax.text(
         0.01,
         -0.1,
-        "Sono mostrati i principali aumenti e le principali diminuzioni tra i Paesi disponibili.",
+        "Confronto temporale, non evidenza di un rapporto causale. Sono mostrati i principali aumenti e le principali diminuzioni.",
         transform=ax.transAxes,
         fontsize=8,
         color="#555555",
@@ -138,15 +138,28 @@ def ranking_chart() -> None:
 def stocks_chart() -> None:
     df = load("results_settima_query.csv")
     df = df[df["anno"].eq(2025)].sort_values("giorni_equivalenti_medi")
-    show = pd.concat([df.head(5), df.tail(10)]).drop_duplicates().sort_values("giorni_equivalenti_medi")
+    zero_values = df[df["giorni_equivalenti_medi"].eq(0)].sort_values("paese")
+    non_zero_values = df[~df["giorni_equivalenti_medi"].eq(0)].tail(10)
+    show = pd.concat([zero_values, non_zero_values]).drop_duplicates().sort_values("giorni_equivalenti_medi")
     fig, ax = plt.subplots(figsize=(9, 6))
-    ax.barh(show["paese"], show["giorni_equivalenti_medi"], color="#2a9d8f")
+    bars = ax.barh(show["paese"], show["giorni_equivalenti_medi"], color="#2a9d8f")
+    for bar, value in zip(bars, show["giorni_equivalenti_medi"]):
+        if value == 0:
+            ax.text(
+                0.8,
+                bar.get_y() + bar.get_height() / 2,
+                "0",
+                va="center",
+                ha="left",
+                fontsize=8,
+                color="#333333",
+            )
     ax.set_xlabel("Giorni equivalenti medi")
     ax.set_title("Autonomia delle scorte petrolifere nel 2025")
     ax.text(
         0.01,
         -0.1,
-        "Top 10 e ultimi 5 Paesi; media annuale dei valori mensili disponibili.",
+        "Top 10 valori non nulli; i sette Paesi con valore 0 sono etichettati esplicitamente.",
         transform=ax.transAxes,
         fontsize=8,
         color="#555555",
