@@ -22,7 +22,7 @@ src/etl/                         Python loading scripts
 sql/schema/                      final DDL and validation checks
 sql/queries/                     business and advanced OLAP queries
 scripts/run_etl.ps1              ordered ETL execution
-requirements.txt                 Python dependencies for the charts
+requirements.txt                 Python dependencies for ETL, profiling, and charts
 ```
 
 ## Architecture
@@ -74,16 +74,16 @@ local databases are not part of the repository.
 
 ## Analytical queries
 
-`01_olap_business_queries.sql` contiene:
+`01_olap_business_queries.sql` contains:
 
 1. Pearson correlation between global GPR and electricity prices;
 2. three-month moving average of oil stocks;
 3. import dependency and gas prices;
 4. annual comparison of metrics for actual EU members.
 
-`02_advanced_olap_queries.sql` contiene:
+`02_advanced_olap_queries.sql` contains:
 
-5. 2022 geopolitical shock and gas-price variation;
+5. 2022 temporal comparison and gas-price variation;
 6. 2024 energy-dependency ranking and percentile;
 7. annual oil-stock autonomy from 2020 to 2025.
 
