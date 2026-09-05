@@ -41,13 +41,14 @@ Interpretazione: associazione lineare osservata, non causalità.
 
 ### Query 4 — UE
 
-| Anno | Membri UE | Dipendenza media | Prezzo elettricità |
-|-:|-:|-:|-:|
-| 2007 | 27 | 56,79% | 0,0898 EUR/kWh |
-| 2020 | 27 | 57,99% | 0,1077 EUR/kWh |
-| 2024 | 27 | 56,04% | 0,1755 EUR/kWh |
+| Anno | Membri UE | Contributori prezzo | Dipendenza media | Prezzo elettricità |
+|-:|-:|-:|-:|-:|
+| 2007 | 27 | 26 | 56,79% | 0,0898 EUR/kWh |
+| 2020 | 27 | 27 | 57,99% | 0,1077 EUR/kWh |
+| 2024 | 27 | 27 | 56,04% | 0,1755 EUR/kWh |
 
 Nel 2019 il conteggio è 28; dal 2020 è 27, coerentemente con la Brexit.
+Nel 2007 un Paese membro non ha un'osservazione di prezzo comparabile.
 
 ### Query 5 — shock 2022
 
