@@ -1,9 +1,10 @@
 # Data sources
 
 This directory documents the official sources and the SDMX metadata used by
-the Energy Security Data Warehouse. The source data themselves are kept locally
-under `data/raw/` and are excluded from GitHub by `.gitignore`; the XML files
-stored here are small, versioned metadata artifacts.
+the Energy Security Data Warehouse. The source data snapshots used by the final
+ETL are versioned under `data/raw/` so that the project can be reproduced
+directly from the repository. The XML files stored here are versioned metadata
+artifacts documenting the same source releases.
 
 ## Eurostat datasets
 
@@ -41,8 +42,8 @@ codes to warehouse dimensions and rejects invalid or incomplete keys.
 
 The project uses the monthly Geopolitical Risk Index dataset published by
 Matteo Iacoviello. The reproducible snapshot is `data_gpr_export_202608.xls`
-under `data/raw/gpr/`; it is intentionally not committed because it is a
-source data file. The ETL selects the global `GPR`, `GPRT` and `GPRA` series,
+under `data/raw/gpr/` and is included in the repository so that the ETL can be
+executed without a separate download step. The ETL selects the global `GPR`, `GPRT` and `GPRA` series,
 requires all three measures to be present and uses the complete comparable
 scope 1985-01–2026-07. The global series are linked to the `GLOBAL` row of
 `DIM_GEO_ENTITY`.

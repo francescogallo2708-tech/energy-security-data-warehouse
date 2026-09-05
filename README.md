@@ -15,7 +15,7 @@ docs/
 ├── modeling/star-schema/        quattro Star Schema definitivi in PNG
 └── results/                     CSV e figure per la presentazione
 
-data/raw/                        sorgenti locali (non versionate)
+data/raw/                        snapshot versionati delle sorgenti usate dagli ETL
 src/profiling/                   analisi esplorativa delle sorgenti
 src/etl/                         script Python di caricamento
 sql/schema/                      DDL definitivo e verifiche
@@ -60,8 +60,8 @@ Il caricamento definitivo è idempotente e non richiede migrazioni intermedie.
 Su un database PostgreSQL vuoto:
 
 1. eseguire `sql/schema/create_dw_schema.sql`;
-2. predisporre le sorgenti nella struttura `data/raw/` descritta in
-   `docs/data-sources/README.md`;
+2. verificare che gli snapshot delle sorgenti siano presenti nella struttura
+   `data/raw/` descritta in `docs/data-sources/README.md`;
 3. eseguire `scripts/run_etl.ps1`, che carica automaticamente dimensioni e
    fact nell'ordine corretto;
 4. eseguire `sql/schema/verify_final_dw.sql` per i controlli di qualità;
@@ -112,6 +112,6 @@ unicità delle chiavi naturali e assenza di orfani dimensionali.
 
 ## Fonti
 
-Le fonti ufficiali, i collegamenti ai dataset Eurostat, i metadati SDMX, le
-frequenze e le trasformazioni applicate sono documentati in
+Le fonti ufficiali, gli snapshot utilizzati, i collegamenti ai dataset Eurostat,
+i metadati SDMX, le frequenze e le trasformazioni applicate sono documentati in
 `docs/data-sources/README.md`.

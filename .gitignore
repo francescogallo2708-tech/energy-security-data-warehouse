@@ -32,9 +32,8 @@ env/
 # Private project notes
 DIARIO_PROGETTO.md
 
-# Raw data: keep source links/metadata in the repository, not large local files
-data/raw/*
-!data/raw/.gitkeep
+# Raw source snapshots are intentionally versioned for reproducibility.
+# Do not add temporary exports or local derived files under data/raw.
 
 # Generated processed data can be recreated by the ETL pipeline
 data/processed/*
