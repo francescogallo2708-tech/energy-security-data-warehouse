@@ -34,6 +34,10 @@ granularità nativa della fonte:
 - `FACT_ENERGY_PRICE`: prezzi dell'energia semestrali;
 - `FACT_OIL_STOCKS`: scorte petrolifere mensili espresse in giorni equivalenti.
 
+In ciascuna fact table la grana è formalizzata da una chiave primaria composta
+dalle chiavi esterne delle relative dimensioni, secondo la traduzione
+DFM-to-Star Schema adottata nel corso.
+
 Le dimensioni temporali sono separate in `DT_MONTH`, `DT_SEMESTER` e `DT_YEAR`.
 `DIM_GEO_ENTITY` è condivisa dai processi e
 `BR_GEO_EU_MEMBERSHIP` rappresenta l'appartenenza storica all'Unione Europea.
@@ -43,6 +47,12 @@ Le misure di rischio, dipendenza e prezzo sono non additive: vengono aggregate
 solo in contesti omogenei con `AVG`, `MIN` o `MAX`. Le scorte sono level measure
 e non vengono sommate nel tempo. I flag Eurostat sono conservati come attributi
 descrittivi nullable.
+
+Il DDL non crea tabelle di staging separate: i file in `data/raw/` costituiscono
+l'area sorgente del processo e gli script ETL applicano direttamente le
+trasformazioni verso dimensioni e fact table. La colonna priva di semantica
+`compliance_status` è stata esclusa da `FACT_OIL_STOCKS`; il relativo stato
+Eurostat è rappresentato da `eurostat_flag`.
 
 ## Esecuzione del data warehouse
 
