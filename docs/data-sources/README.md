@@ -6,6 +6,10 @@ ETL are versioned under `data/raw/` so that the project can be reproduced
 directly from the repository. The XML files stored here are versioned metadata
 artifacts documenting the same source releases.
 
+The ETL transforms the raw files in memory and loads the PostgreSQL warehouse;
+it does not create persistent transformed files under `data/processed/`. The
+directory is kept as a reserved, empty area for possible future derived exports.
+
 ## Eurostat datasets
 
 | Dataset | Official Eurostat link | Role | Frequency / coverage | Local file |

@@ -16,6 +16,7 @@ docs/
 └── results/                     CSV e figure per la presentazione
 
 data/raw/                        snapshot versionati delle sorgenti usate dagli ETL
+data/processed/                  area riservata a eventuali output trasformati persistenti
 src/profiling/                   analisi esplorativa delle sorgenti
 src/etl/                         script Python di caricamento
 sql/schema/                      DDL definitivo e verifiche
