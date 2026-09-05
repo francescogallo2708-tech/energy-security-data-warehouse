@@ -161,7 +161,9 @@ dependency_country_year AS (
     GROUP BY d.year_sk, d.geo_sk
 ),
 dependency_eu_year AS (
-    SELECT year_sk, AVG(dipendenza_paese_pct) AS dipendenza_media_membri_ue_pct
+    SELECT year_sk,
+           COUNT(*) AS numero_paesi_contributori_dipendenza,
+           AVG(dipendenza_paese_pct) AS dipendenza_media_membri_ue_pct
     FROM dependency_country_year
     GROUP BY year_sk
 ),
@@ -182,12 +184,16 @@ price_country_year AS (
     GROUP BY s.year_val, ep.geo_sk
 ),
 price_eu_year AS (
-    SELECT year_sk, AVG(prezzo_paese_elettricita) AS prezzo_medio_elettricita_ue
+    SELECT year_sk,
+           COUNT(*) AS numero_paesi_contributori_prezzo,
+           AVG(prezzo_paese_elettricita) AS prezzo_medio_elettricita_ue
     FROM price_country_year
     GROUP BY year_sk
 )
 SELECT y.year_value AS anno,
        m.numero_paesi_membri_ue,
+       d.numero_paesi_contributori_dipendenza,
+       p.numero_paesi_contributori_prezzo,
        ROUND(d.dipendenza_media_membri_ue_pct, 2) AS dipendenza_media_membri_ue_pct,
        ROUND(p.prezzo_medio_elettricita_ue, 4) AS prezzo_medio_elettricita_ue
 FROM eu_members m
@@ -197,4 +203,3 @@ LEFT JOIN price_eu_year p ON p.year_sk = m.year_sk
 WHERE d.year_sk IS NOT NULL
   AND p.year_sk IS NOT NULL
 ORDER BY y.year_value DESC;
-

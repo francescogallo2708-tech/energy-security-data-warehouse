@@ -5,23 +5,6 @@
 -- del flusso ordinario di consegna.
 -- =========================================================================
 
--- Schema di staging per i dati grezzi
-CREATE SCHEMA IF NOT EXISTS staging;
-
-CREATE TABLE IF NOT EXISTS staging.stg_eurostat_raw (
-    dataset_name VARCHAR(100),
-    metadata_string TEXT,
-    raw_data_json TEXT
-);
-
-CREATE TABLE IF NOT EXISTS staging.stg_gpr_raw (
-    month_date VARCHAR(20),
-    gpr_val NUMERIC,
-    gprt_val NUMERIC,
-    gpra_val NUMERIC,
-    raw_row_data TEXT
-);
-
 -- Tabella Dimensione Geografica Comune
 CREATE TABLE IF NOT EXISTS DIM_GEO_ENTITY (
     geo_sk SERIAL PRIMARY KEY,
@@ -66,13 +49,12 @@ CREATE TABLE IF NOT EXISTS BR_GEO_EU_MEMBERSHIP (
 
 -- 1. Tabella dei Fatti: Rischio Geopolitico Mensile
 CREATE TABLE IF NOT EXISTS FACT_GPR (
-    gpr_fact_id SERIAL PRIMARY KEY,
     month_sk VARCHAR(10) NOT NULL REFERENCES DT_MONTH(month_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
     gpr_val NUMERIC(10, 4) NOT NULL,   -- geopolitical risk index
     gprt_val NUMERIC(10, 4) NOT NULL,  -- GPR Threat index
     gpra_val NUMERIC(10, 4) NOT NULL,  -- GPR Act index
-    CONSTRAINT uk_gpr_month_geo UNIQUE (month_sk, geo_sk),
+    CONSTRAINT pk_fact_gpr PRIMARY KEY (month_sk, geo_sk),
     CONSTRAINT ck_gpr_scope_start CHECK (month_sk >= '1985-01')
 );
 
@@ -95,13 +77,12 @@ CREATE TABLE IF NOT EXISTS DT_ENERGY_PRODUCT (
 -- La sorgente nrg_ind_id usa esclusivamente l'unita PC (percentuale),
 -- validata dall'ETL e quindi implicita nella misura dep_rate_val.
 CREATE TABLE IF NOT EXISTS FACT_IMPORT_DEPENDENCY (
-    dep_fact_id SERIAL PRIMARY KEY,
     year_sk INT NOT NULL REFERENCES DT_YEAR(year_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
     product_sk INT NOT NULL REFERENCES DT_ENERGY_PRODUCT(product_sk),
     eurostat_flag VARCHAR(20),
     dep_rate_val NUMERIC(12, 4) NOT NULL,
-    CONSTRAINT uk_dep_year_geo_product UNIQUE (year_sk, geo_sk, product_sk)
+    CONSTRAINT pk_fact_import_dependency PRIMARY KEY (year_sk, geo_sk, product_sk)
 );
 
 COMMENT ON TABLE DT_ENERGY_PRODUCT IS
@@ -146,7 +127,6 @@ CREATE TABLE IF NOT EXISTS DT_TAX_LEVEL (
 
 -- 3. Tabella dei Fatti: Prezzi dell'Energia (Semestrale)
 CREATE TABLE IF NOT EXISTS FACT_ENERGY_PRICE (
-    price_fact_id SERIAL PRIMARY KEY,
     semester_sk VARCHAR(10) NOT NULL REFERENCES DT_SEMESTER(semester_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
     consumption_band_sk INT NOT NULL REFERENCES DT_CONSUMPTION_BAND(consumption_band_sk),
@@ -154,7 +134,7 @@ CREATE TABLE IF NOT EXISTS FACT_ENERGY_PRICE (
     price_unit_sk INT NOT NULL REFERENCES DT_PRICE_UNIT(price_unit_sk),
     eurostat_flag VARCHAR(20),
     price_val NUMERIC(10, 4) NOT NULL,   -- Prezzo finale
-    CONSTRAINT uk_energy_price UNIQUE (
+    CONSTRAINT pk_fact_energy_price PRIMARY KEY (
         semester_sk,
         geo_sk,
         consumption_band_sk,
@@ -188,15 +168,13 @@ CREATE TABLE IF NOT EXISTS DT_MEASURE_UNIT (
 
 -- 4. Tabella dei Fatti: Indicatori quantitativi di sicurezza petrolifera (Mensile)
 CREATE TABLE IF NOT EXISTS FACT_OIL_STOCKS (
-    stock_fact_id SERIAL PRIMARY KEY,
     month_sk VARCHAR(10) NOT NULL REFERENCES DT_MONTH(month_sk),
     geo_sk INT NOT NULL REFERENCES DIM_GEO_ENTITY(geo_sk),
     indicator_sk INT NOT NULL REFERENCES DT_STOCK_INDICATOR(indicator_sk),
     measure_unit_sk INT NOT NULL REFERENCES DT_MEASURE_UNIT(measure_unit_sk),
-    compliance_status VARCHAR(50),
     eurostat_flag VARCHAR(20),
     indicator_value NUMERIC(14, 4) NOT NULL,
-    CONSTRAINT uk_oil_stocks UNIQUE (month_sk, geo_sk, indicator_sk, measure_unit_sk)
+    CONSTRAINT pk_fact_oil_stocks PRIMARY KEY (month_sk, geo_sk, indicator_sk, measure_unit_sk)
 );
 
 COMMENT ON TABLE FACT_OIL_STOCKS IS
