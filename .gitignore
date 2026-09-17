@@ -10,6 +10,7 @@ __pycache__/
 venv/
 env/
 .env
+.pgpass
 .pgpass.local
 
 # Jupyter and tooling
@@ -29,8 +30,12 @@ env/
 *.sqlite3
 *.db
 
-# Private project notes
+# Private project notes and internal documents
+info_progetto/
 DIARIO_PROGETTO.md
+Analisi_stato_progetto_energy_security.docx
+*.docx
+docs/LOCAL_POSTGRESQL_RUNBOOK.md
 
 # Raw source snapshots are intentionally versioned for reproducibility.
 # Do not add temporary exports or local derived files under data/raw.
@@ -38,3 +43,4 @@ DIARIO_PROGETTO.md
 # Generated processed data can be recreated by the ETL pipeline
 data/processed/*
 !data/processed/.gitkeep
+
