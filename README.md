@@ -11,8 +11,9 @@ stocks.
 docs/
 ├── proposal/                    approved proposal
 ├── data-sources/                sources, metadata, and transformation criteria
-├── modeling/dfm/                four final DFM diagrams in PNG format
-├── modeling/star-schema/        four final Star Schema diagrams in PNG format
+├── modeling/                    Fact Constellation, DFM and Star Schema diagrams
+│   ├── dfm/                     four final DFM diagrams in PNG format
+│   └── star-schema/             four final Star Schema diagrams in PNG format
 └── results/                     CSV files and presentation figures
 
 data/raw/                        versioned source snapshots used by the ETL
@@ -20,8 +21,9 @@ data/processed/                  reserved area for possible persistent transform
 src/profiling/                   exploratory source-data analysis
 src/etl/                         Python loading scripts
 sql/schema/                      final DDL and validation checks
-sql/queries/                     business and advanced OLAP queries
-scripts/run_etl.ps1              ordered ETL execution
+sql/queries/                     business, advanced, and didactic OLAP queries
+scripts/run_etl.sh               ordered ETL execution for macOS / Linux
+scripts/run_etl.ps1              ordered ETL execution for Windows PowerShell
 requirements.txt                 Python dependencies for ETL, profiling, and charts
 ```
 
@@ -63,8 +65,8 @@ migrations. On an empty PostgreSQL database:
 1. run `sql/schema/create_dw_schema.sql`;
 2. verify that the source snapshots are available in the `data/raw/` structure
    described in `docs/data-sources/README.md`;
-3. run `scripts/run_etl.ps1`, which automatically loads dimensions and facts in
-   the correct order;
+3. run `scripts/run_etl.sh` (macOS/Linux) or `scripts/run_etl.ps1` (Windows),
+   which automatically loads dimensions and facts in the correct order;
 4. run `sql/schema/verify_final_dw.sql` to perform quality checks;
 5. run the queries in `sql/queries/`.
 
@@ -87,6 +89,15 @@ local databases are not part of the repository.
 6. 2024 energy-dependency ranking and percentile;
 7. annual oil-stock autonomy from 2020 to 2025.
 
+`03_olap_didactic_session.sql` contains a guided sequence illustrating core multidimensional OLAP operations:
+
+8. **Base**: half-yearly EU gas prices across consumption bands;
+9. **Roll-up**: aggregation from bands to total commodity level;
+10. **Drill-down**: breakdown from EU aggregate to individual member states;
+11. **Slice**: restriction to a single country (Italy);
+12. **Dice**: multi-dimensional subcube (Italy & Germany, 2022–2023, medium consumption band);
+13. **Drill-across**: cross-fact correlation combining emergency oil stocks and geopolitical risk.
+
 Exported results are available in `docs/results/`. Correlations and temporal
 variations describe observed associations and do not demonstrate causality.
 
@@ -94,8 +105,8 @@ variations describe observed associations and do not demonstrate causality.
 
 The figures used in the presentation are generated from the CSV files with:
 
-```powershell
-python src/visualization/create_presentation_charts.py
+```bash
+python3 src/visualization/create_presentation_charts.py
 ```
 
 The script saves six PNG files in `docs/results/figures/`. The selection of
