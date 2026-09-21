@@ -14,7 +14,9 @@ docs/
 ├── modeling/                    Fact Constellation, DFM and Star Schema diagrams
 │   ├── dfm/                     four final DFM diagrams in PNG format
 │   └── star-schema/             four final Star Schema diagrams in PNG format
-└── results/                     CSV files and presentation figures
+├── results/                     CSV files and presentation figures
+├── report/                      formal academic report (PDF)
+└── presentation/                slides for project discussion (PDF/PPTX)
 
 data/raw/                        versioned source snapshots used by the ETL
 data/processed/                  reserved area for possible persistent transformed outputs

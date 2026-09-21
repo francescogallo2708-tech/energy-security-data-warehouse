@@ -20,6 +20,8 @@ env/
 .ruff_cache/
 
 # Logs and temporary files
+.codex-build/
+.codex-finalizer/
 *.log
 *.tmp
 *.bak
