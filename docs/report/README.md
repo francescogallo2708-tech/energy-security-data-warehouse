@@ -1,6 +1,8 @@
-# Project Report
+# Final report
 
-This folder is reserved for the final formal project report (PDF / Markdown) for the *Data Management* course examination.
+The final formal report for the *Data Management* project is:
 
-When finalized, place the PDF document here:
-- `energy_security_data_warehouse_report.pdf` (or `RELAZIONE_PROGETTO.pdf`)
+- `Report_Energy_Security_Data_Warehouse.pdf`
+
+It documents the sources, ETL process, dimensional model, didactic queries,
+analytical queries, results, and interpretation limits.

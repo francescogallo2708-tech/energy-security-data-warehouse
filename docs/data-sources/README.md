@@ -41,6 +41,9 @@ codes to warehouse dimensions and rejects invalid or incomplete keys.
   energy unit and currency in the fact grain; prices are not additive.
 - Oil Stocks retains the four quantitative indicators and excludes the three
   categorical method codes.
+- A numeric zero for the `STK_EUE_DIR` emergency-stock indicator is retained as
+  published by Eurostat. It means zero days reported for that EU-Directive
+  indicator; it does not by itself prove that a country holds no oil reserves.
 
 ## Geopolitical Risk
 

@@ -47,7 +47,12 @@ EU membership is dynamic over time (enlargements from 6 to 28 members, and the 2
 
 ### 4. Non-Additive and Level Measures
 * **Prices, dependency rates, and GPR indices** are *unit / intensive measures*: they cannot be meaningfully summed (`SUM` is strictly prohibited). Aggregations along time and space use `AVG`, `MIN`, or `MAX` in homogeneous contexts.
-* **Emergency oil stocks** are *level measures* (inventory snapshot at the end of each month). They are semi-additive (can be summed across space for identical indicators and units, but never summed across time).
+* **Emergency oil stocks** are monthly inventory indicators. The stock quantity
+  may be additive across homogeneous geographic entities only when expressed in
+  the same physical unit. The indicator used in the analytical results,
+  however, is *days of equivalent consumption*: it is ratio-like and must not
+  be summed across countries or over time. Use `AVG`, `MIN`, or `MAX` according
+  to the analytical question.
 
 ---
 

@@ -37,7 +37,11 @@ info_progetto/
 DIARIO_PROGETTO.md
 Analisi_stato_progetto_energy_security.docx
 *.docx
-docs/LOCAL_POSTGRESQL_RUNBOOK.md
+
+# Regenerable local outputs and Office lock files
+tmp/
+output/
+~$*.pptx
 
 # Raw source snapshots are intentionally versioned for reproducibility.
 # Do not add temporary exports or local derived files under data/raw.
@@ -45,4 +49,3 @@ docs/LOCAL_POSTGRESQL_RUNBOOK.md
 # Generated processed data can be recreated by the ETL pipeline
 data/processed/*
 !data/processed/.gitkeep
-
