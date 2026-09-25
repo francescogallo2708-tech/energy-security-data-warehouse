@@ -12,6 +12,12 @@
 -- 6. Drill-across (joining prices and import dependency at country-year level)
 -- ==============================================================================
 
+-- When this file is executed with psql from the repository root, each result is
+-- exported in CSV format to docs/results/didactic/. SQL clients that do not
+-- support psql meta-commands can execute the SELECT statements individually.
+\pset format csv
+\pset footer off
+\pset pager off
 
 -- ------------------------------------------------------------------------------
 -- 1. Base query
@@ -19,6 +25,7 @@
 -- Using AVG because price is non-additive (cannot be summed).
 -- Fixed filters for homogeneous data: EUR, kWh, excluding VAT, standard household band.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_01_base_query.csv
 SELECT 
     g.country_name AS country,
     s.semester_sk AS semester,
@@ -45,6 +52,7 @@ ORDER BY g.country_name, s.semester_sk;
 -- Replaced semester_sk with year_val in SELECT and GROUP BY.
 -- Number of rows is halved because S1 and S2 are merged into the yearly average.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_02_roll_up.csv
 SELECT 
     g.country_name AS country,
     s.year_val AS year,
@@ -70,6 +78,7 @@ ORDER BY g.country_name, s.year_val;
 -- Increasing detail: comparing households and businesses.
 -- Added consumer_type to GROUP BY and removed the single band filter.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_03_drill_down.csv
 SELECT 
     g.country_name AS country,
     s.year_val AS year,
@@ -95,6 +104,7 @@ ORDER BY g.country_name, s.year_val, cb.consumer_type;
 -- Slicing the cube on one dimension: looking only at Italy.
 -- Just added WHERE country_name = 'Italy'.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_04_slice_italy.csv
 SELECT 
     g.country_name AS country,
     s.year_val AS year,
@@ -122,6 +132,7 @@ ORDER BY s.year_val, cb.consumer_type;
 -- Time: crisis years 2021 to 2023.
 -- Consumers: households only.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_05_dice_italy_germany.csv
 SELECT 
     g.country_name AS country,
     s.year_val AS year,
@@ -149,6 +160,7 @@ ORDER BY g.country_name, s.year_val;
 -- Do NOT join the facts directly (different grains would cause a cartesian product).
 -- Instead, aggregate both in CTEs to (country, year) first, then join.
 -- ------------------------------------------------------------------------------
+\o docs/results/didactic/didactic_06_drill_across.csv
 WITH yearly_prices AS (
     SELECT 
         g.country_name AS country,
@@ -190,3 +202,5 @@ JOIN yearly_dependency dep
 WHERE pr.country IN ('Italy', 'Germany', 'France')
   AND pr.year BETWEEN 2019 AND 2024
 ORDER BY pr.country, pr.year;
+
+\o

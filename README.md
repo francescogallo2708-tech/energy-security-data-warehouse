@@ -143,9 +143,10 @@ psql -v ON_ERROR_STOP=1 -f sql/queries/02_olap_business_queries.sql
 psql -v ON_ERROR_STOP=1 -f sql/queries/03_advanced_olap_queries.sql
 ```
 
-The exported result CSV files and the figures used in the slides are in
-`docs/results/`. To regenerate the six presentation figures from those CSV
-files, run:
+When run with `psql`, the didactic-query file writes six CSV files to
+`docs/results/didactic/`, one for each OLAP operation. The exported analytical
+results and the figures used in the slides are in `docs/results/`. To regenerate
+the six presentation figures from the analytical CSV files, run:
 
 ```bash
 python3 src/visualization/create_presentation_charts.py
